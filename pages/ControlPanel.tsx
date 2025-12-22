@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, UserPlus, SkipBack, Repeat, Hash, ArrowLeftRight, Send, AlertCircle, Play, Pause, Bell, Clock, ChevronRight } from 'lucide-react';
+import { LogOut, UserPlus, SkipBack, Repeat, Hash, ArrowLeftRight, Send, AlertCircle, Play, Pause, Bell, Clock, ChevronRight, RefreshCw } from 'lucide-react';
 import { toHindiDigits, playCallSequence, playSimpleSound } from '../utils';
 import { Clinic, Notification } from '../types';
 import { supabase, subscribeToChanges } from '../supabase';
@@ -33,6 +33,7 @@ const ControlPanel: React.FC = () => {
 
       const notifSub = subscribeToChanges('notifications', (payload) => {
         const n = payload.new as Notification;
+        // الاستماع للرسائل الموجهة لهذه العيادة أو الطوارئ
         if (n.to_clinic === selectedClinic.id || n.type === 'emergency') {
           setInboundNotifications(prev => [n, ...prev]);
           playSimpleSound('/audio/ring.mp3');
@@ -73,7 +74,7 @@ const ControlPanel: React.FC = () => {
     if (!transferTargetId || !selectedClinic) return;
     const num = patientNum || selectedClinic.current_number;
     
-    await supabase.from('notifications').insert({
+    const { error } = await supabase.from('notifications').insert({
       from_clinic: selectedClinic.name,
       to_clinic: transferTargetId,
       message: `تم تحويل العميل رقم (${num}) إليكم من ${selectedClinic.name}`,
@@ -81,8 +82,12 @@ const ControlPanel: React.FC = () => {
       patient_number: num
     });
     
-    alert(`تم تحويل العميل ${num} بنجاح`);
-    setShowTransferModal(false);
+    if(!error) {
+      alert(`تم تحويل العميل ${num} بنجاح`);
+      setShowTransferModal(false);
+    } else {
+      alert("خطأ في التحويل");
+    }
   };
 
   const callByName = async () => {
@@ -90,7 +95,7 @@ const ControlPanel: React.FC = () => {
     await supabase.from('notifications').insert({
       from_clinic: selectedClinic.name,
       message: customPatient,
-      type: 'name_call' // نوع خاص للشاشة لتعرض الاسم
+      type: 'name_call'
     });
     setCustomPatient('');
   };
@@ -107,6 +112,12 @@ const ControlPanel: React.FC = () => {
 
   const changeStatus = async (status: 'active' | 'paused') => {
     if (selectedClinic) await supabase.from('clinics').update({ status }).eq('id', selectedClinic.id);
+  };
+
+  const resetCounter = async () => {
+    if (selectedClinic && confirm('هل أنت متأكد من تصفير العداد لهذه العيادة؟')) {
+      await supabase.from('clinics').update({ current_number: 0 }).eq('id', selectedClinic.id);
+    }
   };
 
   if (!isLoggedIn) {
@@ -137,7 +148,10 @@ const ControlPanel: React.FC = () => {
           <div className="bg-emerald-600 text-white p-4 px-6 rounded-3xl font-black text-4xl shadow-lg">{toHindiDigits(selectedClinic?.current_number || 0)}</div>
           <div><h1 className="text-2xl font-black text-slate-800">{selectedClinic?.name}</h1></div>
         </div>
-        <button onClick={() => setIsLoggedIn(false)} className="bg-slate-100 p-4 rounded-2xl"><LogOut /></button>
+        <div className="flex items-center gap-4">
+          <button onClick={resetCounter} className="p-4 bg-red-50 text-red-600 rounded-2xl hover:bg-red-600 hover:text-white transition-all"><RefreshCw /></button>
+          <button onClick={() => setIsLoggedIn(false)} className="bg-slate-100 p-4 rounded-2xl"><LogOut /></button>
+        </div>
       </header>
 
       <main className="flex-1 p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 max-w-[1600px] mx-auto w-full">
@@ -174,7 +188,7 @@ const ControlPanel: React.FC = () => {
         </section>
 
         <section className="lg:col-span-4 bg-white p-8 rounded-[2.5rem] shadow-sm border flex flex-col h-[650px]">
-          <h3 className="text-xl font-black flex items-center gap-3 mb-6"><Bell className="text-amber-500" /> التنبيهات</h3>
+          <h3 className="text-xl font-black flex items-center gap-3 mb-6"><Bell className="text-amber-500" /> التنبيهات الواردة</h3>
           <div className="flex-1 overflow-y-auto space-y-4">
             {inboundNotifications.length === 0 ? <p className="text-center text-slate-300 mt-20">لا توجد رسائل</p> : 
               inboundNotifications.map((n, i) => (

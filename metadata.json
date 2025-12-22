@@ -1,0 +1,7 @@
+{
+  "name": "QueueAI",
+  "description": "نظام متكامل لإدارة طوابير الانتظار والنداء الآلي للعيادات الطبية مع دعم حي للبيانات والتحكم الكامل.",
+  "requestFramePermissions": [
+    "microphone"
+  ]
+}

@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
-import { Maximize, Settings as SettingsIcon, Bell, Clock, X, Volume2, User, Stethoscope } from 'lucide-react';
+// Add missing 'Tv' icon to the lucide-react imports
+import { Maximize, Settings as SettingsIcon, Bell, Clock, X, Volume2, User, Stethoscope, Sliders, Layout, Tv } from 'lucide-react';
 import { toHindiDigits, playCallSequence, playSimpleSound } from '../utils';
 import { Clinic, SystemSettings, Notification, Doctor, Screen } from '../types';
 import { supabase, subscribeToChanges } from '../supabase';
@@ -19,13 +20,15 @@ const DisplayScreen: React.FC = () => {
   const [showConfig, setShowConfig] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
 
+  // Deep UI Configuration
   const [config, setConfig] = useState({
-    cardHeight: '140px',
-    fontSize: '2.5rem',
+    cardHeight: '160px',
+    fontSize: '3.5rem',
     columns: 2,
-    layoutSplit: '1/3',
+    layoutSplit: '1/3' as '1/4' | '1/3' | '1/2' | '2/3',
     themeColor: '#2563eb',
-    cardBg: '#ffffff'
+    cardBg: '#ffffff',
+    cardTextColor: '#1e3a8a'
   });
 
   useEffect(() => {
@@ -89,20 +92,47 @@ const DisplayScreen: React.FC = () => {
     }
   };
 
+  const getLeftWidth = () => {
+    switch (config.layoutSplit) {
+      case '1/4': return 'w-1/4';
+      case '1/3': return 'w-1/3';
+      case '1/2': return 'w-1/2';
+      case '2/3': return 'w-2/3';
+    }
+  };
+
+  const getRightWidth = () => {
+    switch (config.layoutSplit) {
+      case '1/4': return 'w-3/4';
+      case '1/3': return 'w-2/3';
+      case '1/2': return 'w-1/2';
+      case '2/3': return 'w-1/3';
+    }
+  };
+
   const currentDoctor = doctors[currentDoctorIdx];
 
   if (!isLoggedIn) {
     return (
-      <div className="flex-1 flex items-center justify-center bg-slate-900">
-        <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl w-96">
-          <h2 className="text-2xl font-black mb-6 text-center">تفعيل الشاشة</h2>
-          <div className="space-y-4">
-            <select className="w-full p-4 border-2 rounded-2xl font-bold" value={selectedScreenId} onChange={e => setSelectedScreenId(e.target.value)}>
-              <option value="">-- اختر الشاشة --</option>
-              {screens.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-            </select>
-            <input type="password" placeholder="كلمة السر" className="w-full p-4 border-2 rounded-2xl text-center font-bold" value={password} onChange={(e) => setPassword(e.target.value)} />
-            <button onClick={handleStartDisplay} className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black flex items-center justify-center gap-3"><Volume2 /> تشغيل العرض</button>
+      <div className="flex-1 flex items-center justify-center bg-slate-900 p-6">
+        <div className="bg-white p-10 rounded-[3rem] shadow-2xl w-full max-w-md border-t-8 border-blue-600 animate-fadeIn">
+          <div className="flex flex-col items-center mb-8">
+             <div className="p-5 bg-blue-50 text-blue-600 rounded-full mb-4"><Tv size={50}/></div>
+             <h2 className="text-3xl font-black text-slate-800">تنشيط شاشة العرض</h2>
+          </div>
+          <div className="space-y-5">
+            <div>
+              <label className="text-xs font-black text-slate-400 block mb-2 px-1 uppercase">اسم الشاشة</label>
+              <select className="w-full p-5 border-2 rounded-3xl font-black bg-slate-50 outline-none focus:border-blue-600 transition-all" value={selectedScreenId} onChange={e => setSelectedScreenId(e.target.value)}>
+                <option value="">-- اختر الشاشة --</option>
+                {screens.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+              </select>
+            </div>
+            <div>
+              <label className="text-xs font-black text-slate-400 block mb-2 px-1 uppercase">كلمة المرور</label>
+              <input type="password" placeholder="أدخل كلمة السر" className="w-full p-5 border-2 rounded-3xl text-center font-black bg-slate-50 outline-none focus:border-blue-600 transition-all text-2xl tracking-[0.5em]" value={password} onChange={(e) => setPassword(e.target.value)} />
+            </div>
+            <button onClick={handleStartDisplay} className="w-full bg-blue-600 text-white py-6 rounded-3xl font-black text-xl flex items-center justify-center gap-4 shadow-xl shadow-blue-200 hover:scale-105 active:scale-95 transition-all"><Volume2 /> تشغيل العرض والصوت</button>
           </div>
         </div>
       </div>
@@ -110,67 +140,155 @@ const DisplayScreen: React.FC = () => {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-slate-100 overflow-hidden relative">
-      <header className="h-20 bg-white border-b shadow-sm flex items-center justify-between px-8 z-10">
-        <div className="flex items-center gap-6">
-          <div className="bg-blue-600 text-white px-6 py-2 rounded-xl font-black text-2xl" style={{ backgroundColor: config.themeColor }}>{settings?.center_name}</div>
-          <div className="flex flex-col text-slate-500 font-bold"><span className="flex items-center gap-2"><Clock size={16} /> {currentTime.toLocaleTimeString('ar-EG')}</span></div>
+    <div className="h-screen flex flex-col bg-slate-100 overflow-hidden relative font-cairo">
+      {/* Dynamic Header */}
+      <header className="h-24 bg-white border-b-4 border-slate-100 shadow-sm flex items-center justify-between px-10 z-20">
+        <div className="flex items-center gap-8">
+          <div className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black text-3xl shadow-lg shadow-blue-100 animate-slideRight" style={{ backgroundColor: config.themeColor }}>
+            {settings?.center_name}
+          </div>
+          <div className="flex flex-col text-slate-500 font-black">
+            <span className="flex items-center gap-3 text-2xl"><Clock size={24} className="text-blue-500" /> {currentTime.toLocaleTimeString('ar-EG')}</span>
+            <span className="text-xs opacity-70 uppercase tracking-widest">{currentTime.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
+          </div>
         </div>
-        <button onClick={() => setShowConfig(true)} className="p-2 text-slate-400"><SettingsIcon size={24} /></button>
+        <div className="flex items-center gap-5">
+          <button onClick={() => setShowConfig(true)} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-slate-100 transition-colors"><SettingsIcon size={28} /></button>
+          <button onClick={() => document.documentElement.requestFullscreen()} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-slate-100 transition-colors"><Maximize size={28} /></button>
+        </div>
       </header>
 
       <main className="flex-1 flex overflow-hidden">
-        <div className="w-1/3 p-4 bg-slate-200 overflow-hidden flex flex-col gap-4">
-          <div className="flex-1 overflow-y-auto grid gap-4 auto-rows-min" style={{ gridTemplateColumns: `repeat(${config.columns}, minmax(0, 1fr))` }}>
+        {/* Left Side: Clinics Grid & Promos */}
+        <div className={`${getLeftWidth()} p-4 bg-slate-200 overflow-hidden flex flex-col gap-4 border-l-4 border-slate-300 transition-all duration-700`}>
+          <div className="flex-1 overflow-y-auto grid gap-4 auto-rows-min scrollbar-hide" style={{ gridTemplateColumns: `repeat(${config.columns}, minmax(0, 1fr))` }}>
             {clinics.map(clinic => (
-              <div key={clinic.id} className={`rounded-2xl shadow-md p-4 flex flex-col items-center justify-center border-b-8 transition-all ${clinic.status === 'active' ? 'border-green-500' : 'border-red-500'}`} style={{ height: config.cardHeight, backgroundColor: config.cardBg }}>
-                <span className="text-xs font-bold text-slate-500 text-center">{clinic.name}</span>
-                <span className="font-black text-blue-800" style={{ fontSize: config.fontSize }}>{toHindiDigits(clinic.current_number)}</span>
+              <div 
+                key={clinic.id} 
+                className={`rounded-[2.5rem] shadow-2xl p-6 flex flex-col items-center justify-center border-b-[12px] transition-all duration-500 hover:scale-[1.02] ${clinic.status === 'active' ? 'border-green-500' : 'border-red-500 animate-pulse'}`} 
+                style={{ height: config.cardHeight, backgroundColor: config.cardBg }}
+              >
+                <span className="text-sm font-black text-slate-400 mb-2 truncate w-full text-center uppercase tracking-tighter">{clinic.name}</span>
+                <span className="font-black text-blue-900" style={{ fontSize: config.fontSize, color: config.cardTextColor }}>{toHindiDigits(clinic.current_number)}</span>
+                {clinic.status !== 'active' && <span className="text-[10px] font-black text-red-500 uppercase mt-1">متوقفة مؤقتاً</span>}
               </div>
             ))}
           </div>
           
           {/* Doctor Promotion Card */}
           {currentDoctor && (
-            <div className="h-44 bg-white rounded-3xl border-r-[12px] border-blue-600 shadow-xl p-4 flex items-center gap-5 animate-slideIn">
-              <div className="w-24 h-24 bg-slate-100 rounded-2xl overflow-hidden flex items-center justify-center shrink-0 border-2 border-slate-50">
-                 {currentDoctor.image_url ? <img src={currentDoctor.image_url} className="w-full h-full object-cover" /> : <User size={40} className="text-slate-300" />}
+            <div className="h-48 bg-white rounded-[3rem] border-r-[15px] border-blue-600 shadow-2xl p-6 flex items-center gap-6 animate-slideIn relative overflow-hidden group">
+              <div className="absolute top-0 left-0 w-32 h-32 bg-blue-50 rounded-full -ml-16 -mt-16 opacity-50 group-hover:scale-150 transition-transform duration-700" />
+              <div className="w-28 h-28 bg-slate-50 rounded-[2rem] overflow-hidden flex items-center justify-center shrink-0 border-4 border-white shadow-md z-10">
+                 {currentDoctor.image_url ? <img src={currentDoctor.image_url} className="w-full h-full object-cover" /> : <User size={50} className="text-slate-300" />}
               </div>
-              <div className="overflow-hidden">
-                <p className="text-xs font-black text-blue-500 uppercase tracking-widest mb-1">تعرف على أطبائنا</p>
-                <h4 className="text-xl font-black text-slate-800 truncate">{currentDoctor.name}</h4>
-                <p className="text-sm font-bold text-slate-400 flex items-center gap-2 mt-1"><Stethoscope size={14} /> {currentDoctor.specialty}</p>
+              <div className="overflow-hidden z-10">
+                <p className="text-xs font-black text-blue-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                  <Stethoscope size={14} /> تعرف على أطبائنا
+                </p>
+                <h4 className="text-3xl font-black text-slate-800 truncate mb-1">{currentDoctor.name}</h4>
+                <p className="text-lg font-bold text-slate-400 italic">{currentDoctor.specialty}</p>
               </div>
             </div>
           )}
         </div>
 
-        <div className="w-2/3 bg-black flex items-center justify-center relative">
+        {/* Right Side: Video & Main Notification */}
+        <div className={`${getRightWidth()} bg-black flex items-center justify-center relative transition-all duration-700`}>
           <video className="w-full h-full object-cover opacity-60" autoPlay muted loop src="/videos/display.mp4" />
+          
           {notification && (
-            <div className="absolute inset-0 flex items-center justify-center p-10 bg-black/50 animate-fadeIn">
-              <div className="bg-white border-8 border-blue-600 rounded-[3rem] p-12 shadow-2xl animate-bounce text-center max-w-2xl">
-                <Bell size={80} className="text-blue-600 mx-auto mb-6" />
-                <h2 className="text-5xl font-black text-slate-800 leading-tight">{notification}</h2>
+            <div className="absolute inset-0 flex items-center justify-center p-12 bg-black/50 backdrop-blur-sm z-50 animate-fadeIn">
+              <div className="bg-white border-[15px] border-blue-600 rounded-[5rem] p-16 shadow-[0_0_100px_rgba(37,99,235,0.4)] animate-bounce text-center max-w-4xl relative overflow-hidden">
+                <div className="absolute top-0 left-0 w-full h-4 bg-gradient-to-r from-blue-400 via-blue-600 to-blue-400" />
+                <Bell size={120} className="text-blue-600 mx-auto mb-10 drop-shadow-lg" />
+                <h2 className="text-6xl font-black text-slate-800 leading-tight drop-shadow-sm">{notification}</h2>
+                <div className="mt-10 flex items-center justify-center gap-4 text-blue-600">
+                   <div className="h-2 w-2 rounded-full bg-blue-600 animate-ping" />
+                   <p className="text-xl font-black uppercase tracking-[0.3em]">برجاء الانتباه</p>
+                   <div className="h-2 w-2 rounded-full bg-blue-600 animate-ping" />
+                </div>
               </div>
             </div>
           )}
         </div>
       </main>
 
-      <footer className="h-16 bg-blue-900 text-white overflow-hidden flex items-center" style={{ backgroundColor: config.themeColor }}>
-        <div className="animate-marquee px-4 text-2xl font-bold" style={{ '--speed': `${settings?.ticker_speed || 20}s` } as any}>{settings?.ticker_content}</div>
+      {/* Marquee Footer */}
+      <footer className="h-20 bg-blue-900 text-white overflow-hidden flex items-center relative z-20 border-t-4 border-white/10" style={{ backgroundColor: config.themeColor }}>
+        <div className="absolute left-0 h-full bg-white/10 px-6 flex items-center font-black z-10 backdrop-blur-md">أخبار العيادة</div>
+        <div className="animate-marquee px-4 text-3xl font-black" style={{ '--speed': `${settings?.ticker_speed || 20}s` } as any}>
+          {settings?.ticker_content}
+        </div>
       </footer>
 
+      {/* Deep Customization Modal */}
       {showConfig && (
-        <div className="absolute inset-0 bg-black/80 z-[100] flex items-center justify-center p-6">
-          <div className="bg-white rounded-3xl p-8 max-w-md w-full">
-            <div className="flex justify-between items-center mb-6"><h3 className="text-xl font-bold">تخصيص العرض</h3><button onClick={() => setShowConfig(false)}><X /></button></div>
-            <div className="space-y-4">
-               <div><label className="text-xs font-bold block mb-1">الأعمدة</label><input type="number" className="w-full p-2 border rounded-lg" value={config.columns} onChange={e => setConfig({...config, columns: parseInt(e.target.value)})}/></div>
-               <div><label className="text-xs font-bold block mb-1">لون السمة</label><input type="color" className="w-full h-10 p-1 border rounded-lg" value={config.themeColor} onChange={e => setConfig({...config, themeColor: e.target.value})}/></div>
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-8 animate-fadeIn">
+          <div className="bg-white rounded-[4rem] p-12 max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
+            <div className="flex justify-between items-center mb-10 border-b-2 pb-6">
+              <div className="flex items-center gap-4">
+                <div className="p-3 bg-blue-100 text-blue-600 rounded-2xl"><Layout size={32}/></div>
+                <h3 className="text-4xl font-black text-slate-800">تخصيص واجهة العرض</h3>
+              </div>
+              <button onClick={() => setShowConfig(false)} className="p-4 bg-slate-50 rounded-full hover:bg-slate-100 transition-colors"><X size={32}/></button>
             </div>
-            <button onClick={() => setShowConfig(false)} className="w-full mt-6 bg-blue-600 text-white py-3 rounded-xl font-bold">حفظ</button>
+            
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+               {/* Layout Controls */}
+               <div className="space-y-6">
+                  <h4 className="font-black text-blue-600 flex items-center gap-2 border-b pb-2"><Sliders size={18}/> إعدادات المساحة</h4>
+                  <div className="space-y-4">
+                     <div>
+                       <label className="text-sm font-bold block mb-2">تقسيم الشاشة (العيادات : الفيديو)</label>
+                       <select className="w-full p-4 bg-slate-50 border rounded-2xl font-bold outline-none focus:border-blue-600" value={config.layoutSplit} onChange={e => setConfig({...config, layoutSplit: e.target.value as any})}>
+                          <option value="1/4">الربع (1/4 : 3/4)</option>
+                          <option value="1/3">الثلث (1/3 : 2/3)</option>
+                          <option value="1/2">النصف (1/2 : 1/2)</option>
+                          <option value="2/3">الثلثين (2/3 : 1/3)</option>
+                       </select>
+                     </div>
+                     <div>
+                        <label className="text-sm font-bold block mb-2">عدد أعمدة العيادات</label>
+                        <input type="range" min="1" max="4" step="1" className="w-full h-3 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600" value={config.columns} onChange={e => setConfig({...config, columns: parseInt(e.target.value)})}/>
+                        <div className="flex justify-between text-xs font-black mt-2"><span>1</span><span>2</span><span>3</span><span>4</span></div>
+                     </div>
+                  </div>
+               </div>
+
+               {/* Aesthetics Controls */}
+               <div className="space-y-6">
+                  <h4 className="font-black text-blue-600 flex items-center gap-2 border-b pb-2"><Volume2 size={18}/> إعدادات المظهر والخط</h4>
+                  <div className="space-y-4">
+                     <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-bold block mb-2">طول الكارت (px)</label>
+                          <input type="text" className="w-full p-3 border rounded-xl font-bold" value={config.cardHeight} onChange={e => setConfig({...config, cardHeight: e.target.value})} />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold block mb-2">حجم الخط (rem)</label>
+                          <input type="text" className="w-full p-3 border rounded-xl font-bold" value={config.fontSize} onChange={e => setConfig({...config, fontSize: e.target.value})} />
+                        </div>
+                     </div>
+                     <div className="grid grid-cols-2 gap-4">
+                        <div>
+                          <label className="text-xs font-bold block mb-2">لون السمة</label>
+                          <input type="color" className="w-full h-12 p-1 border rounded-xl" value={config.themeColor} onChange={e => setConfig({...config, themeColor: e.target.value})} />
+                        </div>
+                        <div>
+                          <label className="text-xs font-bold block mb-2">خلفية الكروت</label>
+                          <input type="color" className="w-full h-12 p-1 border rounded-xl" value={config.cardBg} onChange={e => setConfig({...config, cardBg: e.target.value})} />
+                        </div>
+                     </div>
+                     <div>
+                        <label className="text-xs font-bold block mb-2">لون الأرقام</label>
+                        <input type="color" className="w-full h-12 p-1 border rounded-xl" value={config.cardTextColor} onChange={e => setConfig({...config, cardTextColor: e.target.value})} />
+                     </div>
+                  </div>
+               </div>
+            </div>
+
+            <button onClick={() => setShowConfig(false)} className="w-full mt-12 bg-slate-900 text-white py-6 rounded-[2rem] font-black text-2xl shadow-2xl hover:bg-black transition-all">تطبيق وحفظ التعديلات</button>
           </div>
         </div>
       )}

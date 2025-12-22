@@ -17,12 +17,10 @@ const AdminPanel: React.FC = () => {
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [adminNotifications, setAdminNotifications] = useState<Notification[]>([]);
   
-  // Remote Control States
   const [targetClinicId, setTargetClinicId] = useState<string>('');
   const [customName, setCustomName] = useState('');
   const [remoteMsg, setRemoteMsg] = useState('');
 
-  // Print States
   const [printClinicId, setPrintClinicId] = useState('');
   const [printRange, setPrintRange] = useState({ from: 1, to: 20 });
 
@@ -41,7 +39,7 @@ const AdminPanel: React.FC = () => {
   const fetchData = async () => {
     const { data: c } = await supabase.from('clinics').select('*').order('number');
     if (c) setClinics(c);
-    const { data: d } = await supabase.from('doctors').select('*');
+    const { data: d } = await supabase.from('doctors').select('*').order('name');
     if (d) setDoctors(d);
     const { data: s } = await supabase.from('screens').select('*').order('number');
     if (s) setScreens(s);
@@ -56,11 +54,8 @@ const AdminPanel: React.FC = () => {
     }
   };
 
-  const handlePrint = () => {
-    window.print();
-  };
+  const handlePrint = () => window.print();
 
-  // Remote Actions
   const remoteAction = async (action: string, payload?: any) => {
     if (!targetClinicId) return alert('اختر العيادة أولاً');
     const clinic = clinics.find(c => c.id === targetClinicId);
@@ -90,13 +85,7 @@ const AdminPanel: React.FC = () => {
         setCustomName('');
         break;
       case 'msg_clinic':
-        // إرسال رسالة مباشرة للعيادة
-        await supabase.from('notifications').insert({ 
-          from_clinic: 'الإدارة', 
-          to_clinic: targetClinicId, 
-          message: remoteMsg, 
-          type: 'normal' 
-        });
+        await supabase.from('notifications').insert({ from_clinic: 'الإدارة', to_clinic: targetClinicId, message: remoteMsg, type: 'normal' });
         setRemoteMsg('');
         alert('تم إرسال الرسالة للعيادة');
         break;
@@ -164,9 +153,29 @@ const AdminPanel: React.FC = () => {
           </div>
         )}
 
+        {activeTab === 'doctors' && (
+           <div className="space-y-6 animate-fadeIn print:hidden">
+             <div className="flex justify-between items-center"><h3 className="text-3xl font-black">إدارة الأطباء</h3><button onClick={async () => { const name = prompt('اسم الطبيب:'); if(name) { await supabase.from('doctors').insert({ name, specialty:'طبيب متخصص', number: doctors.length+1 }); fetchData(); } }} className="bg-purple-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2"><Plus /> إضافة طبيب</button></div>
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {doctors.map(d => (
+                  <div key={d.id} className="bg-white p-6 rounded-3xl border shadow-sm flex items-center gap-4">
+                    <div className="w-16 h-16 bg-slate-100 rounded-2xl flex items-center justify-center overflow-hidden shrink-0">
+                      {d.image_url ? <img src={d.image_url} className="w-full h-full object-cover" /> : <Stethoscope size={32} className="text-slate-300" />}
+                    </div>
+                    <div className="flex-1">
+                      <h4 className="font-black text-slate-800">{d.name}</h4>
+                      <p className="text-sm font-bold text-slate-400">{d.specialty}</p>
+                    </div>
+                    <button onClick={() => deleteItem('doctors', d.id)} className="text-red-400 hover:text-red-600"><Trash2 size={16}/></button>
+                  </div>
+                ))}
+             </div>
+           </div>
+        )}
+
         {activeTab === 'screens' && (
           <div className="space-y-6 animate-fadeIn print:hidden">
-            <div className="flex justify-between items-center"><h3 className="text-3xl font-black">إدارة الشاشات</h3><button onClick={async () => { const name = prompt('اسم الشاشة الجديدة:'); const pass = prompt('كلمة السر:'); if(name) { await supabase.from('screens').insert({ name, password: pass || '123', number: screens.length + 1 }); fetchData(); } }} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2"><Plus /> إضافة شاشة</button></div>
+            <div className="flex justify-between items-center"><h3 className="text-3xl font-black">إدارة الشاشات</h3><button onClick={async () => { const name = prompt('اسم الشاشة:'); if(name) { await supabase.from('screens').insert({ name, password: '123', number: screens.length+1 }); fetchData(); } }} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2"><Plus /> إضافة شاشة</button></div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {screens.map(s => (
                 <div key={s.id} className="bg-white p-6 rounded-3xl border shadow-sm">
@@ -176,92 +185,51 @@ const AdminPanel: React.FC = () => {
                   </div>
                   <h4 className="text-xl font-black mb-1">{s.name}</h4>
                   <p className="text-xs font-bold text-slate-400 mb-4">كلمة السر: {s.password}</p>
-                  <div className="flex gap-2">
-                    <button onClick={async () => { const n = prompt('الاسم الجديد:', s.name); if(n) { await supabase.from('screens').update({name: n}).eq('id', s.id); fetchData(); } }} className="flex-1 p-2 bg-slate-50 rounded-xl font-bold text-slate-600 flex items-center justify-center gap-2 text-sm"><Edit size={14}/> تعديل</button>
-                  </div>
                 </div>
               ))}
             </div>
           </div>
         )}
 
-        {activeTab === 'remote' && (
+        {activeTab === 'remote' && selectedRemoteClinic && (
           <div className="space-y-8 animate-fadeIn print:hidden">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-              <h3 className="text-3xl font-black">التحكم الموحد بالعيادات</h3>
+              <h3 className="text-3xl font-black">التحكم الموحد</h3>
               <select className="p-4 border-2 border-blue-100 rounded-2xl font-black bg-blue-50 text-blue-700 min-w-[300px]" value={targetClinicId} onChange={e => setTargetClinicId(e.target.value)}>
-                <option value="">-- اختر العيادة للتحكم --</option>
+                <option value="">-- اختر العيادة --</option>
                 {clinics.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
-
-            {selectedRemoteClinic ? (
-              <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
-                <div className="lg:col-span-4 bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-6">
-                  <div className="flex items-center justify-between">
-                    <h4 className="font-black text-lg">التحكم في الطابور</h4>
-                    <span className="bg-emerald-600 text-white px-4 py-2 rounded-full font-black">{toHindiDigits(selectedRemoteClinic.current_number)}</span>
-                  </div>
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+               <div className="bg-white p-8 rounded-3xl border shadow-sm">
+                  <h4 className="font-black mb-6">الطابور</h4>
                   <div className="grid grid-cols-2 gap-4">
-                    <button onClick={() => remoteAction('next')} className="p-6 bg-emerald-600 text-white rounded-3xl font-black flex flex-col items-center gap-2"><UserPlus /> التالي</button>
-                    <button onClick={() => remoteAction('prev')} className="p-6 bg-slate-100 text-slate-600 rounded-3xl font-black flex flex-col items-center gap-2"><SkipBack /> السابق</button>
-                    <button onClick={() => remoteAction('repeat')} className="p-6 bg-blue-50 text-blue-700 rounded-3xl font-black flex flex-col items-center gap-2 border border-blue-100"><Repeat /> تكرار</button>
-                    <button onClick={() => { const num = prompt('الرقم الجديد:'); if(num) supabase.from('clinics').update({current_number: parseInt(num)}).eq('id', targetClinicId).then(fetchData); }} className="p-6 bg-purple-50 text-purple-700 rounded-3xl font-black flex flex-col items-center gap-2 border border-purple-100"><Hash /> رقم مخصص</button>
+                    <button onClick={() => remoteAction('next')} className="p-4 bg-emerald-600 text-white rounded-xl font-bold">التالي</button>
+                    <button onClick={() => remoteAction('prev')} className="p-4 bg-slate-100 rounded-xl font-bold">السابق</button>
+                    <button onClick={() => remoteAction('repeat')} className="p-4 bg-blue-50 text-blue-600 rounded-xl font-bold">تكرار</button>
+                    <button onClick={() => remoteAction('reset')} className="p-4 bg-red-50 text-red-600 rounded-xl font-bold">تصفير</button>
                   </div>
-                  <button onClick={() => remoteAction('reset')} className="w-full p-4 border-2 border-dashed border-red-200 text-red-500 rounded-2xl font-black hover:bg-red-50 transition-all">تصفير عداد العيادة</button>
-                </div>
-
-                <div className="lg:col-span-4 bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-6">
-                  <h4 className="font-black text-lg">الرسائل والنداء</h4>
+               </div>
+               <div className="bg-white p-8 rounded-3xl border shadow-sm">
+                  <h4 className="font-black mb-6">الرسائل</h4>
                   <div className="space-y-4">
-                    <div>
-                      <label className="text-xs font-bold text-slate-400 mb-1 block">نداء مريض بالاسم:</label>
-                      <div className="flex gap-2">
-                        <input className="flex-1 p-3 border rounded-xl font-bold" placeholder="اسم المريض..." value={customName} onChange={e => setCustomName(e.target.value)} />
-                        <button onClick={() => remoteAction('name')} className="bg-blue-600 text-white p-3 rounded-xl"><Send size={20}/></button>
-                      </div>
-                    </div>
-                    <div>
-                      <label className="text-xs font-bold text-slate-400 mb-1 block">رسالة لوحة العيادة:</label>
-                      <div className="flex gap-2">
-                        <input className="flex-1 p-3 border rounded-xl font-bold" placeholder="اكتب رسالة للعيادة..." value={remoteMsg} onChange={e => setRemoteMsg(e.target.value)} />
-                        <button onClick={() => remoteAction('msg_clinic')} className="bg-emerald-600 text-white p-3 rounded-xl"><MessageSquare size={20}/></button>
-                      </div>
-                    </div>
-                    <div className="pt-4 border-t">
-                       <p className="text-xs font-black text-slate-400 mb-3 uppercase">الطوارئ</p>
-                       <div className="grid grid-cols-2 gap-2">
-                          <button onClick={() => remoteAction('emergency', 'تنبيه طوارئ: حريق!')} className="bg-red-600 text-white p-3 rounded-xl font-bold text-xs flex items-center gap-2"><AlertCircle size={14}/> حريق</button>
-                          <button onClick={() => remoteAction('emergency', 'تنبيه طوارئ: تسرب غاز!')} className="bg-orange-500 text-white p-3 rounded-xl font-bold text-xs flex items-center gap-2"><AlertCircle size={14}/> غاز</button>
-                          <button onClick={() => remoteAction('emergency', 'يرجى التوجه لنقطة التجمع')} className="bg-amber-500 text-white p-3 rounded-xl font-bold text-xs flex items-center gap-2"><AlertCircle size={14}/> تجمع</button>
-                          <button onClick={() => { const m = prompt('رسالة طوارئ:'); if(m) remoteAction('emergency', m); }} className="bg-slate-700 text-white p-3 rounded-xl font-bold text-xs flex items-center gap-2"><Hash size={14}/> نص مخصص</button>
-                       </div>
-                    </div>
+                    <input className="w-full p-3 border rounded-xl" placeholder="رسالة للعيادة" value={remoteMsg} onChange={e => setRemoteMsg(e.target.value)} />
+                    <button onClick={() => remoteAction('msg_clinic')} className="w-full p-3 bg-emerald-600 text-white rounded-xl font-bold">إرسال</button>
                   </div>
-                </div>
-
-                <div className="lg:col-span-4 bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-6">
-                  <h4 className="font-black text-lg">الحالة والإعدادات</h4>
-                  <div className="space-y-4">
-                    <button onClick={() => { playSimpleSound('/audio/ring.mp3'); alert('تم رن الجرس'); }} className="w-full p-4 bg-slate-50 text-slate-700 rounded-2xl font-bold border flex items-center justify-between">رن الجرس في العيادة <Volume2 size={18}/></button>
-                    <div className="flex gap-4">
-                      <button onClick={() => remoteAction('status', 'paused')} className={`flex-1 p-4 rounded-xl font-bold ${selectedRemoteClinic.status === 'paused' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-600'}`}>توقف</button>
-                      <button onClick={() => remoteAction('status', 'active')} className={`flex-1 p-4 rounded-xl font-bold ${selectedRemoteClinic.status === 'active' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-600'}`}>استئناف</button>
-                    </div>
+               </div>
+               <div className="bg-white p-8 rounded-3xl border shadow-sm">
+                  <h4 className="font-black mb-6">الطوارئ</h4>
+                  <div className="grid grid-cols-2 gap-2">
+                    <button onClick={() => remoteAction('emergency', 'حريق!')} className="p-3 bg-red-600 text-white rounded-xl text-xs font-bold">حريق</button>
+                    <button onClick={() => remoteAction('emergency', 'تجمع')} className="p-3 bg-orange-600 text-white rounded-xl text-xs font-bold">نقطة تجمع</button>
                   </div>
-                </div>
-              </div>
-            ) : (
-              <div className="flex flex-col items-center justify-center py-40 text-slate-300">
-                <Mic size={100} className="mb-6 opacity-20" />
-                <p className="text-2xl font-black italic">برجاء اختيار العيادة لبدء التحكم</p>
-              </div>
-            )}
+               </div>
+            </div>
           </div>
         )}
 
         {activeTab === 'print' && (
-          <div className="animate-fadeIn">
+          <div className="animate-fadeIn print:block">
             <div className="mb-10 p-8 bg-white rounded-3xl border shadow-sm space-y-6 print:hidden">
               <h3 className="text-2xl font-black">طباعة التذاكر</h3>
               <div className="grid grid-cols-1 md:grid-cols-3 gap-6">

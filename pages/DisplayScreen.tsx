@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Maximize, Settings as SettingsIcon, Bell, Clock, X, Volume2, User, Stethoscope, Sliders, Layout, Tv, QrCode, PhoneForwarded } from 'lucide-react';
+import { Maximize, Settings as SettingsIcon, Bell, Clock, X, Volume2, User, Stethoscope, Sliders, Layout, Tv, QrCode } from 'lucide-react';
 import { toHindiDigits, playCallSequence, playSimpleSound } from '../utils';
 import { Clinic, SystemSettings, Notification, Doctor, Screen } from '../types';
 import { supabase, subscribeToChanges } from '../supabase';
@@ -15,11 +15,12 @@ const DisplayScreen: React.FC = () => {
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [currentDoctorIdx, setCurrentDoctorIdx] = useState(0);
-  const [notification, setNotification] = useState<string | null>(null);
+  const [activeNotification, setActiveNotification] = useState<{ msg: string; type: string } | null>(null);
   const [showConfig, setShowConfig] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
 
   const [config, setConfig] = useState({
+    cardWidth: '100%',
     cardHeight: '160px',
     fontSize: '3.5rem',
     columns: 2,
@@ -40,9 +41,12 @@ const DisplayScreen: React.FC = () => {
       if (payload.eventType === 'UPDATE') {
         setClinics(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
         if (payload.old && payload.new.current_number !== payload.old.current_number) {
-          setNotification(`على العميل رقم ${toHindiDigits(payload.new.current_number)} التوجه لـ ${payload.new.name}`);
+          setActiveNotification({ 
+            msg: `على العميل رقم ${toHindiDigits(payload.new.current_number)} التوجه لـ ${payload.new.name}`, 
+            type: 'normal' 
+          });
           if (audioReady) playCallSequence(payload.new.current_number, payload.new.number);
-          setTimeout(() => setNotification(null), 8000);
+          setTimeout(() => setActiveNotification(null), 8000);
         }
       } else { fetchInitialData(); }
     });
@@ -50,13 +54,17 @@ const DisplayScreen: React.FC = () => {
     const notifSub = subscribeToChanges('notifications', (payload) => {
       const n = payload.new as Notification;
       if (n.type === 'emergency') {
-        setNotification(`تنبيه طارئ: ${n.message}`);
+        setActiveNotification({ msg: `تنبيه طارئ: ${n.message}`, type: 'emergency' });
         if (audioReady) playSimpleSound('/audio/emergency.mp3');
-        setTimeout(() => setNotification(null), 15000);
+        setTimeout(() => setActiveNotification(null), 15000);
       } else if (n.type === 'name_call') {
-        setNotification(`الرجاء من المريض: ${n.message} التوجه للعيادة`);
+        setActiveNotification({ msg: `الرجاء من المريض: ${n.message} التوجه للعيادة`, type: 'normal' });
         if (audioReady) playSimpleSound('/audio/ding.mp3');
-        setTimeout(() => setNotification(null), 12000);
+        setTimeout(() => setActiveNotification(null), 12000);
+      } else if (n.type === 'transfer') {
+        setActiveNotification({ msg: n.message, type: 'transfer' });
+        if (audioReady) playSimpleSound('/audio/ding.mp3');
+        setTimeout(() => setActiveNotification(null), 10000);
       }
     });
 
@@ -75,7 +83,7 @@ const DisplayScreen: React.FC = () => {
     if (s) setSettings(s);
     const { data: c } = await supabase.from('clinics').select('*').order('number');
     if (c) setClinics(c);
-    const { data: d } = await supabase.from('doctors').select('*');
+    const { data: d } = await supabase.from('doctors').select('*').order('name');
     if (d) setDoctors(d);
   };
 
@@ -86,7 +94,7 @@ const DisplayScreen: React.FC = () => {
       setAudioReady(true);
       playSimpleSound('/audio/ding.mp3');
     } else {
-      alert('اسم الشاشة أو كلمة السر غير صحيحة');
+      alert('البيانات غير صحيحة');
     }
   };
 
@@ -96,15 +104,15 @@ const DisplayScreen: React.FC = () => {
       case '1/3': return 'w-1/3';
       case '1/2': return 'w-1/2';
       case '2/3': return 'w-2/3';
+      default: return 'w-1/3';
     }
   };
 
-  const getRightWidth = () => {
-    switch (config.layoutSplit) {
-      case '1/4': return 'w-3/4';
-      case '1/3': return 'w-2/3';
-      case '1/2': return 'w-1/2';
-      case '2/3': return 'w-1/3';
+  const getNotificationStyles = (type: string) => {
+    switch (type) {
+      case 'emergency': return 'border-red-600 bg-red-50 text-red-900 notification-red';
+      case 'transfer': return 'border-blue-600 bg-blue-50 text-blue-900 notification-blue';
+      default: return 'border-green-600 bg-green-50 text-green-900 notification-green';
     }
   };
 
@@ -113,24 +121,15 @@ const DisplayScreen: React.FC = () => {
   if (!isLoggedIn) {
     return (
       <div className="flex-1 flex items-center justify-center bg-slate-900 p-6">
-        <div className="bg-white p-10 rounded-[3rem] shadow-2xl w-full max-w-md border-t-8 border-blue-600 animate-fadeIn">
-          <div className="flex flex-col items-center mb-8">
-             <div className="p-5 bg-blue-50 text-blue-600 rounded-full mb-4"><Tv size={50}/></div>
-             <h2 className="text-3xl font-black text-slate-800">تنشيط شاشة العرض</h2>
-          </div>
+        <div className="bg-white p-10 rounded-[3rem] shadow-2xl w-full max-w-md border-t-8 border-blue-600">
+          <h2 className="text-3xl font-black text-center mb-8">تنشيط العرض</h2>
           <div className="space-y-5">
-            <div>
-              <label className="text-xs font-black text-slate-400 block mb-2 px-1 uppercase">اسم الشاشة</label>
-              <select className="w-full p-5 border-2 rounded-3xl font-black bg-slate-50 outline-none focus:border-blue-600 transition-all" value={selectedScreenId} onChange={e => setSelectedScreenId(e.target.value)}>
-                <option value="">-- اختر الشاشة --</option>
-                {screens.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="text-xs font-black text-slate-400 block mb-2 px-1 uppercase">كلمة المرور</label>
-              <input type="password" placeholder="أدخل كلمة السر" className="w-full p-5 border-2 rounded-3xl text-center font-black bg-slate-50 outline-none focus:border-blue-600 transition-all text-2xl tracking-[0.5em]" value={password} onChange={(e) => setPassword(e.target.value)} />
-            </div>
-            <button onClick={handleStartDisplay} className="w-full bg-blue-600 text-white py-6 rounded-3xl font-black text-xl flex items-center justify-center gap-4 shadow-xl shadow-blue-200 hover:scale-105 active:scale-95 transition-all"><Volume2 /> تشغيل العرض والصوت</button>
+            <select className="w-full p-5 border-2 rounded-3xl font-black bg-slate-50" value={selectedScreenId} onChange={e => setSelectedScreenId(e.target.value)}>
+              <option value="">-- اختر الشاشة --</option>
+              {screens.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
+            </select>
+            <input type="password" placeholder="كلمة المرور" className="w-full p-5 border-2 rounded-3xl text-center font-black bg-slate-50" value={password} onChange={(e) => setPassword(e.target.value)} />
+            <button onClick={handleStartDisplay} className="w-full bg-blue-600 text-white py-6 rounded-3xl font-black text-xl flex items-center justify-center gap-4"><Volume2 /> تشغيل</button>
           </div>
         </div>
       </div>
@@ -139,77 +138,67 @@ const DisplayScreen: React.FC = () => {
 
   return (
     <div className="h-screen flex flex-col bg-slate-100 overflow-hidden relative font-cairo">
-      <header className="h-24 bg-white border-b-4 border-slate-100 shadow-sm flex items-center justify-between px-10 z-20">
+      <header className="h-24 bg-white border-b-4 flex items-center justify-between px-10 z-20 shadow-sm">
         <div className="flex items-center gap-8">
-          <div className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black text-3xl shadow-lg shadow-blue-100 animate-slideRight" style={{ backgroundColor: config.themeColor }}>
+          <div className="bg-blue-600 text-white px-8 py-3 rounded-2xl font-black text-3xl shadow-lg" style={{ backgroundColor: config.themeColor }}>
             {settings?.center_name}
           </div>
-          <div className="flex flex-col text-slate-500 font-black">
-            <span className="flex items-center gap-3 text-2xl"><Clock size={24} className="text-blue-500" /> {currentTime.toLocaleTimeString('ar-EG')}</span>
-            <span className="text-xs opacity-70 uppercase tracking-widest">{currentTime.toLocaleDateString('ar-EG', { weekday: 'long', day: 'numeric', month: 'long' })}</span>
-          </div>
+          <span className="flex items-center gap-3 text-2xl font-black text-slate-500"><Clock size={24} /> {currentTime.toLocaleTimeString('ar-EG')}</span>
         </div>
         <div className="flex items-center gap-5">
-          <button onClick={() => setShowConfig(true)} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-slate-100 transition-colors"><SettingsIcon size={28} /></button>
-          <button onClick={() => document.documentElement.requestFullscreen()} className="p-3 bg-slate-50 text-slate-400 rounded-2xl hover:bg-slate-100 transition-colors"><Maximize size={28} /></button>
+          <button onClick={() => setShowConfig(true)} className="p-3 bg-slate-50 rounded-2xl"><SettingsIcon size={28} /></button>
+          <button onClick={() => document.documentElement.requestFullscreen()} className="p-3 bg-slate-50 rounded-2xl"><Maximize size={28} /></button>
         </div>
       </header>
 
       <main className="flex-1 flex overflow-hidden">
-        <div className={`${getLeftWidth()} p-4 bg-slate-200 overflow-hidden flex flex-col gap-4 border-l-4 border-slate-300 transition-all duration-700`}>
+        <div className={`${getLeftWidth()} p-4 bg-slate-200 overflow-hidden flex flex-col gap-4 border-l-4 border-slate-300`}>
           <div className="flex-1 overflow-y-auto grid gap-4 auto-rows-min scrollbar-hide" style={{ gridTemplateColumns: `repeat(${config.columns}, minmax(0, 1fr))` }}>
             {clinics.map(clinic => (
               <div 
                 key={clinic.id} 
-                className={`rounded-[2.5rem] shadow-2xl p-6 flex flex-col items-center justify-center border-b-[12px] transition-all duration-500 hover:scale-[1.02] ${clinic.status === 'active' ? 'border-green-500' : 'border-red-500 animate-pulse'}`} 
-                style={{ height: config.cardHeight, backgroundColor: config.cardBg }}
+                className={`rounded-[2.5rem] shadow-xl p-6 flex flex-col items-center justify-center border-b-[10px] transition-all ${clinic.status === 'active' ? 'border-green-500' : 'border-red-500 animate-pulse'}`} 
+                style={{ height: config.cardHeight, width: config.cardWidth, backgroundColor: config.cardBg, margin: '0 auto' }}
               >
-                <span className="text-sm font-black text-slate-400 mb-2 truncate w-full text-center uppercase tracking-tighter">{clinic.name}</span>
-                <span className="font-black text-blue-900" style={{ fontSize: config.fontSize, color: config.cardTextColor }}>{toHindiDigits(clinic.current_number)}</span>
-                {clinic.status !== 'active' && <span className="text-[10px] font-black text-red-500 uppercase mt-1">متوقفة مؤقتاً</span>}
+                <span className="text-sm font-black text-slate-400 mb-2 truncate text-center w-full">{clinic.name}</span>
+                <span className="font-black" style={{ fontSize: config.fontSize, color: config.cardTextColor }}>{toHindiDigits(clinic.current_number)}</span>
               </div>
             ))}
           </div>
           
           <div className="grid grid-cols-2 gap-4">
-             {/* Doctor Promo */}
-             {currentDoctor && (
-              <div className="bg-white rounded-[2.5rem] border-r-[10px] border-blue-600 shadow-xl p-4 flex items-center gap-4 animate-slideIn relative overflow-hidden h-40">
-                <div className="w-20 h-20 bg-slate-50 rounded-2xl overflow-hidden flex items-center justify-center shrink-0 border-2 border-slate-100 shadow-sm z-10">
+            {currentDoctor && (
+              <div className="bg-white rounded-[2.5rem] border-r-[10px] border-blue-600 shadow-lg p-4 flex items-center gap-4 h-36">
+                <div className="w-16 h-16 bg-slate-50 rounded-2xl overflow-hidden flex items-center justify-center shrink-0 border">
                    {currentDoctor.image_url ? <img src={currentDoctor.image_url} className="w-full h-full object-cover" /> : <User size={30} className="text-slate-300" />}
                 </div>
-                <div className="overflow-hidden z-10">
-                  <p className="text-[10px] font-black text-blue-500 uppercase mb-1">طاقمنا الطبي</p>
+                <div className="overflow-hidden">
                   <h4 className="text-lg font-black text-slate-800 truncate">{currentDoctor.name}</h4>
                   <p className="text-xs font-bold text-slate-400">{currentDoctor.specialty}</p>
                 </div>
               </div>
             )}
-            
-            {/* QR Follow Up */}
-            <div className="bg-white rounded-[2.5rem] border-r-[10px] border-amber-500 shadow-xl p-4 flex items-center gap-4 animate-slideIn h-40">
-              <div className="w-20 h-20 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center shrink-0 border-2 border-amber-100 shadow-sm">
-                 <QrCode size={40} />
+            <div className="bg-white rounded-[2.5rem] border-r-[10px] border-amber-500 shadow-lg p-4 flex items-center gap-4 h-36">
+              <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center shrink-0 border">
+                 <QrCode size={32} />
               </div>
               <div className="overflow-hidden">
-                <p className="text-[10px] font-black text-amber-600 uppercase mb-1">مسح الكود</p>
                 <h4 className="text-lg font-black text-slate-800">تابع دورك</h4>
-                <p className="text-[9px] font-bold text-slate-400">امسح الكود لمتابعة دورك من هاتفك لحظة بلحظة</p>
+                <p className="text-[10px] font-bold text-slate-400">امسح الكود لمتابعة حالة الانتظار</p>
               </div>
             </div>
           </div>
         </div>
 
-        <div className={`${getRightWidth()} bg-black flex items-center justify-center relative transition-all duration-700`}>
+        <div className="flex-1 bg-black flex items-center justify-center relative">
           <video className="w-full h-full object-cover opacity-60" autoPlay muted loop src="/videos/display.mp4" />
           
-          {notification && (
-            <div className="absolute top-10 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-50 animate-shake">
-              <div className="bg-white border-4 border-blue-600 rounded-[3rem] p-8 shadow-[0_0_50px_rgba(37,99,235,0.3)] text-center relative overflow-hidden backdrop-blur-md">
-                <div className="absolute top-0 left-0 w-full h-2 bg-blue-600" />
+          {activeNotification && (
+            <div className="absolute top-10 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-50">
+              <div className={`border-4 rounded-[3rem] p-10 shadow-2xl text-center relative overflow-hidden ${getNotificationStyles(activeNotification.type)}`}>
                 <div className="flex items-center justify-center gap-6">
-                   <Bell size={40} className="text-blue-600 animate-bounce" />
-                   <h2 className="text-3xl font-black text-slate-800 leading-tight">{notification}</h2>
+                   <Bell size={48} className="animate-bounce" />
+                   <h2 className="text-4xl font-black leading-tight">{activeNotification.msg}</h2>
                 </div>
               </div>
             </div>
@@ -217,57 +206,60 @@ const DisplayScreen: React.FC = () => {
         </div>
       </main>
 
-      <footer className="h-20 bg-blue-900 text-white overflow-hidden flex items-center relative z-20 border-t-4 border-white/10" style={{ backgroundColor: config.themeColor }}>
-        <div className="absolute left-0 h-full bg-white/10 px-6 flex items-center font-black z-10 backdrop-blur-md">أخبار العيادة</div>
+      <footer className="h-20 bg-blue-900 text-white overflow-hidden flex items-center relative z-20 border-t-4" style={{ backgroundColor: config.themeColor }}>
+        <div className="absolute left-0 h-full bg-white/20 px-6 flex items-center font-black z-10 backdrop-blur-md">أخبار العيادة</div>
         <div className="animate-marquee px-4 text-3xl font-black" style={{ '--speed': `${settings?.ticker_speed || 20}s` } as any}>
           {settings?.ticker_content}
         </div>
       </footer>
 
       {showConfig && (
-        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-8 animate-fadeIn">
-          <div className="bg-white rounded-[4rem] p-12 max-w-4xl w-full max-h-[90vh] overflow-y-auto shadow-2xl">
-            <div className="flex justify-between items-center mb-10 border-b-2 pb-6">
-              <div className="flex items-center gap-4">
-                <div className="p-3 bg-blue-100 text-blue-600 rounded-2xl"><Layout size={32}/></div>
-                <h3 className="text-4xl font-black text-slate-800">تخصيص واجهة العرض</h3>
-              </div>
-              <button onClick={() => setShowConfig(false)} className="p-4 bg-slate-50 rounded-full hover:bg-slate-100 transition-colors"><X size={32}/></button>
+        <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-8">
+          <div className="bg-white rounded-[4rem] p-12 max-w-4xl w-full max-h-[90vh] overflow-y-auto">
+            <div className="flex justify-between items-center mb-10 border-b pb-6">
+               <h3 className="text-3xl font-black">إعدادات العرض</h3>
+               <button onClick={() => setShowConfig(false)} className="p-4 bg-slate-50 rounded-full"><X size={32}/></button>
             </div>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+            <div className="grid grid-cols-2 gap-10">
                <div className="space-y-6">
-                  <h4 className="font-black text-blue-600 flex items-center gap-2 border-b pb-2"><Sliders size={18}/> إعدادات المساحة</h4>
-                  <div className="space-y-4">
+                  <h4 className="font-black text-blue-600 border-b pb-2">أبعاد الكروت</h4>
+                  <div className="grid grid-cols-2 gap-4">
                      <div>
-                       <label className="text-sm font-bold block mb-2">تقسيم الشاشة</label>
-                       <select className="w-full p-4 bg-slate-50 border rounded-2xl font-bold outline-none" value={config.layoutSplit} onChange={e => setConfig({...config, layoutSplit: e.target.value as any})}>
-                          <option value="1/4">الربع (1/4 : 3/4)</option>
-                          <option value="1/3">الثلث (1/3 : 2/3)</option>
-                          <option value="1/2">النصف (1/2 : 1/2)</option>
-                          <option value="2/3">الثلثين (2/3 : 1/3)</option>
-                       </select>
+                       <label className="text-xs font-bold block mb-1">عرض الكارت (width)</label>
+                       <input className="w-full p-3 border rounded-xl" value={config.cardWidth} onChange={e => setConfig({...config, cardWidth: e.target.value})} />
                      </div>
                      <div>
-                        <label className="text-sm font-bold block mb-2">عدد أعمدة العيادات</label>
-                        <input type="range" min="1" max="4" step="1" className="w-full h-3 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600" value={config.columns} onChange={e => setConfig({...config, columns: parseInt(e.target.value)})}/>
+                       <label className="text-xs font-bold block mb-1">طول الكارت (height)</label>
+                       <input className="w-full p-3 border rounded-xl" value={config.cardHeight} onChange={e => setConfig({...config, cardHeight: e.target.value})} />
                      </div>
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold block mb-1">حجم الخط (fontSize)</label>
+                    <input className="w-full p-3 border rounded-xl" value={config.fontSize} onChange={e => setConfig({...config, fontSize: e.target.value})} />
+                  </div>
+                  <div>
+                    <label className="text-xs font-bold block mb-1">عدد الأعمدة</label>
+                    <input type="number" className="w-full p-3 border rounded-xl" value={config.columns} onChange={e => setConfig({...config, columns: parseInt(e.target.value)})} />
                   </div>
                </div>
                <div className="space-y-6">
-                  <h4 className="font-black text-blue-600 flex items-center gap-2 border-b pb-2"><Volume2 size={18}/> المظهر والخط</h4>
-                  <div className="space-y-4">
-                     <div className="grid grid-cols-2 gap-4">
-                        <input type="text" className="p-3 border rounded-xl font-bold" placeholder="طول الكارت" value={config.cardHeight} onChange={e => setConfig({...config, cardHeight: e.target.value})} />
-                        <input type="text" className="p-3 border rounded-xl font-bold" placeholder="حجم الخط" value={config.fontSize} onChange={e => setConfig({...config, fontSize: e.target.value})} />
-                     </div>
-                     <div className="grid grid-cols-2 gap-4">
-                        <input type="color" className="w-full h-12 p-1 border rounded-xl" value={config.themeColor} onChange={e => setConfig({...config, themeColor: e.target.value})} />
-                        <input type="color" className="w-full h-12 p-1 border rounded-xl" value={config.cardBg} onChange={e => setConfig({...config, cardBg: e.target.value})} />
-                     </div>
+                  <h4 className="font-black text-blue-600 border-b pb-2">التصميم العام</h4>
+                  <div>
+                    <label className="text-xs font-bold block mb-1">تقسيم الشاشة</label>
+                    <select className="w-full p-3 border rounded-xl" value={config.layoutSplit} onChange={e => setConfig({...config, layoutSplit: e.target.value as any})}>
+                       <option value="1/4">الربع</option>
+                       <option value="1/3">الثلث</option>
+                       <option value="1/2">النصف</option>
+                       <option value="2/3">الثلثين</option>
+                    </select>
+                  </div>
+                  <div className="grid grid-cols-2 gap-4">
+                    <input type="color" className="w-full h-12" value={config.themeColor} onChange={e => setConfig({...config, themeColor: e.target.value})} />
+                    <input type="color" className="w-full h-12" value={config.cardBg} onChange={e => setConfig({...config, cardBg: e.target.value})} />
                   </div>
                </div>
             </div>
-            <button onClick={() => setShowConfig(false)} className="w-full mt-12 bg-slate-900 text-white py-6 rounded-[2rem] font-black text-2xl shadow-2xl hover:bg-black transition-all">تطبيق وحفظ التعديلات</button>
+            <button onClick={() => setShowConfig(false)} className="w-full mt-12 bg-slate-900 text-white py-6 rounded-3xl font-black text-xl shadow-xl">تطبيق الإعدادات</button>
           </div>
         </div>
       )}

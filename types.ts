@@ -49,16 +49,7 @@ export interface Notification {
   to_clinic?: string;
   to_admin?: boolean;
   message: string;
-  // Added 'name_call' to the type union to allow specific patient name calling
   type: 'normal' | 'emergency' | 'transfer' | 'name_call';
   created_at: string;
   patient_number?: number;
-}
-
-export interface Transfer {
-  id: string;
-  from_clinic_id: string;
-  to_clinic_id: string;
-  patient_number: number;
-  created_at: string;
 }

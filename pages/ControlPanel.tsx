@@ -1,7 +1,8 @@
 
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LogOut, UserPlus, SkipBack, Repeat, Hash, ArrowLeftRight, Send, AlertCircle, RefreshCw, Play, Pause, Bell } from 'lucide-react';
+// Add Clock to the imports from lucide-react
+import { LogOut, UserPlus, SkipBack, Repeat, Hash, ArrowLeftRight, Send, AlertCircle, RefreshCw, Play, Pause, Bell, Phone, Clock } from 'lucide-react';
 import { toHindiDigits, playCallSequence, playSimpleSound } from '../utils';
 import { Clinic, Notification } from '../types';
 import { supabase, subscribeToChanges } from '../supabase';
@@ -13,6 +14,7 @@ const ControlPanel: React.FC = () => {
   const [password, setPassword] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
   const [inboundNotifications, setInboundNotifications] = useState<Notification[]>([]);
+  const [customPatient, setCustomPatient] = useState('');
 
   useEffect(() => {
     fetchClinics();
@@ -22,11 +24,14 @@ const ControlPanel: React.FC = () => {
 
   useEffect(() => {
     if (isLoggedIn && selectedClinic) {
-      // الاشتراك في التنبيهات الموجهة لهذه العيادة
       const sub = subscribeToChanges('notifications', (payload) => {
         if (payload.new.to_clinic === selectedClinic.id || payload.new.type === 'emergency') {
           setInboundNotifications(prev => [payload.new as Notification, ...prev]);
           playSimpleSound('/audio/ring.mp3');
+          // Visible alert for the doctor
+          if (payload.new.type === 'emergency') {
+             alert(`تنبيه طوارئ: ${payload.new.message}`);
+          }
         }
       });
       return () => { supabase.removeChannel(sub); };
@@ -34,7 +39,7 @@ const ControlPanel: React.FC = () => {
   }, [isLoggedIn, selectedClinic]);
 
   const fetchClinics = async () => {
-    const { data, error } = await supabase.from('clinics').select('*').order('number');
+    const { data } = await supabase.from('clinics').select('*').order('number');
     if (data) setClinics(data);
   };
 
@@ -45,7 +50,7 @@ const ControlPanel: React.FC = () => {
       setIsLoggedIn(true);
       setSelectedClinic(clinic);
     } else {
-      alert('كلمة السر خاطئة أو العيادة غير مختارة');
+      alert('كلمة السر خاطئة');
     }
   };
 
@@ -70,41 +75,48 @@ const ControlPanel: React.FC = () => {
     if (data) setSelectedClinic(data);
   };
 
-  const sendEmergency = async (msg: string) => {
+  const sendAlert = async (type: string, msg: string, toAdmin = false) => {
     await supabase.from('notifications').insert({
       from_clinic: selectedClinic?.name,
       message: msg,
-      type: 'emergency'
+      type,
+      to_admin: toAdmin
     });
-    playSimpleSound('/audio/emergency.mp3');
+    if (type === 'emergency') playSimpleSound('/audio/emergency.mp3');
   };
 
   if (!isLoggedIn) {
     return (
-      <div className="flex-1 flex items-center justify-center p-4 bg-emerald-50">
-        <div className="bg-white p-8 rounded-2xl shadow-xl w-full max-w-md">
-          <h2 className="text-2xl font-bold mb-6 text-center text-emerald-700">دخول العيادة</h2>
-          <form onSubmit={handleLogin} className="space-y-4">
+      <div className="flex-1 flex items-center justify-center p-4 bg-slate-900">
+        <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl w-full max-w-md">
+          <div className="flex flex-col items-center mb-8">
+            <div className="bg-emerald-100 text-emerald-600 p-4 rounded-3xl mb-4">
+              <LogOut size={40} className="rotate-180" />
+            </div>
+            <h2 className="text-3xl font-black text-slate-800">دخول العيادة</h2>
+            <p className="text-slate-400 text-sm mt-1">الرجاء اختيار العيادة وكلمة السر</p>
+          </div>
+          <form onSubmit={handleLogin} className="space-y-6">
             <div>
-              <label className="block text-sm mb-1">اختر العيادة</label>
+              <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">العيادة</label>
               <select 
-                className="w-full p-3 border rounded-lg"
+                className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold focus:border-emerald-500 transition-colors outline-none"
                 onChange={(e) => setSelectedClinic(clinics.find(c => c.id === e.target.value) || null)}
               >
-                <option value="">-- اختر العيادة --</option>
+                <option value="">-- اختر من القائمة --</option>
                 {clinics.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
               </select>
             </div>
             <div>
-              <label className="block text-sm mb-1">كلمة المرور</label>
+              <label className="block text-xs font-black text-slate-400 mb-2 uppercase tracking-widest">كلمة المرور</label>
               <input 
                 type="password" 
-                className="w-full p-3 border rounded-lg"
+                className="w-full p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl font-bold focus:border-emerald-500 transition-colors outline-none"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
               />
             </div>
-            <button className="w-full bg-emerald-600 text-white py-3 rounded-lg font-bold hover:bg-emerald-700">دخول اللوحة</button>
+            <button className="w-full bg-emerald-600 text-white py-5 rounded-2xl font-black text-lg shadow-xl shadow-emerald-100 hover:bg-emerald-700 active:scale-95 transition-all">فتح لوحة التحكم</button>
           </form>
         </div>
       </div>
@@ -112,80 +124,137 @@ const ControlPanel: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-100">
-      <header className="bg-emerald-600 text-white p-4 flex justify-between items-center shadow-lg">
-        <div className="flex items-center gap-4">
-          <div className="bg-white text-emerald-600 p-2 px-4 rounded-lg font-black text-2xl">
+    <div className="flex-1 flex flex-col bg-slate-50 min-h-screen">
+      <header className="bg-white border-b p-6 flex justify-between items-center px-10">
+        <div className="flex items-center gap-6">
+          <div className="bg-emerald-600 text-white p-4 px-6 rounded-3xl font-black text-4xl shadow-lg shadow-emerald-100">
             {toHindiDigits(selectedClinic?.current_number || 0)}
           </div>
           <div>
-            <h1 className="text-xl font-bold">{selectedClinic?.name}</h1>
-            <p className="text-xs opacity-80">{currentTime.toLocaleTimeString('ar-EG')}</p>
+            <h1 className="text-2xl font-black text-slate-800">{selectedClinic?.name}</h1>
+            <p className="text-sm font-bold text-slate-400 flex items-center gap-2">
+              <Clock size={14} /> {currentTime.toLocaleTimeString('ar-EG')}
+            </p>
           </div>
         </div>
-        <button onClick={() => setIsLoggedIn(false)} className="bg-white/10 px-4 py-2 rounded-lg hover:bg-white/20 flex items-center gap-2">
-          <LogOut size={18} /> خروج
-        </button>
+        <div className="flex gap-3">
+          <div className={`px-4 py-2 rounded-full font-bold flex items-center gap-2 ${selectedClinic?.status === 'active' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+            <div className={`w-2 h-2 rounded-full ${selectedClinic?.status === 'active' ? 'bg-green-500 animate-pulse' : 'bg-red-500'}`} />
+            {selectedClinic?.status === 'active' ? 'نشطة' : 'متوقفة'}
+          </div>
+          <button onClick={() => setIsLoggedIn(false)} className="bg-slate-100 text-slate-600 p-4 rounded-2xl hover:bg-slate-200 transition-colors">
+            <LogOut size={24} />
+          </button>
+        </div>
       </header>
 
-      <main className="flex-1 p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 max-w-7xl mx-auto w-full">
-        <section className="bg-white p-6 rounded-2xl shadow-sm space-y-4">
-          <h3 className="font-bold border-b pb-2 text-slate-500">تحكم النداء</h3>
-          <div className="grid grid-cols-2 gap-3">
-            <button onClick={() => updateNumber((selectedClinic?.current_number || 0) + 1)} className="flex flex-col items-center p-4 bg-emerald-50 text-emerald-700 rounded-xl border border-emerald-100 hover:bg-emerald-100">
-              <UserPlus className="mb-2" /> العميل التالي
+      <main className="flex-1 p-8 grid grid-cols-1 lg:grid-cols-12 gap-8 max-w-[1600px] mx-auto w-full">
+        
+        {/* Call Controls */}
+        <section className="lg:col-span-4 bg-white p-8 rounded-[2.5rem] shadow-sm border space-y-8">
+          <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
+            <UserPlus className="text-emerald-500" /> تحكم الطابور
+          </h3>
+          <div className="grid grid-cols-2 gap-4">
+            <button onClick={() => updateNumber((selectedClinic?.current_number || 0) + 1)} className="flex flex-col items-center justify-center p-8 bg-emerald-600 text-white rounded-[2rem] hover:bg-emerald-700 transition-all shadow-xl shadow-emerald-100 group">
+              <UserPlus size={48} className="mb-3 group-hover:scale-110 transition-transform" />
+              <span className="font-black">العميل التالي</span>
             </button>
-            <button onClick={() => updateNumber(Math.max(0, (selectedClinic?.current_number || 0) - 1))} className="flex flex-col items-center p-4 bg-slate-50 text-slate-700 rounded-xl border border-slate-100 hover:bg-slate-100">
-              <SkipBack className="mb-2" /> السابق
+            <button onClick={() => updateNumber(Math.max(0, (selectedClinic?.current_number || 0) - 1))} className="flex flex-col items-center justify-center p-8 bg-slate-100 text-slate-600 rounded-[2rem] hover:bg-slate-200 transition-all group">
+              <SkipBack size={48} className="mb-3 group-hover:scale-110 transition-transform" />
+              <span className="font-black">السابق</span>
             </button>
-            <button onClick={() => updateNumber(selectedClinic?.current_number || 0)} className="flex flex-col items-center p-4 bg-blue-50 text-blue-700 rounded-xl border border-blue-100 hover:bg-blue-100">
-              <Repeat className="mb-2" /> تكرار النداء
+            <button onClick={() => updateNumber(selectedClinic?.current_number || 0)} className="flex flex-col items-center justify-center p-8 bg-blue-50 text-blue-700 rounded-[2rem] border-2 border-blue-100 hover:bg-blue-100 transition-all group">
+              <Repeat size={48} className="mb-3 group-hover:scale-110 transition-transform" />
+              <span className="font-black">تكرار النداء</span>
             </button>
             <button onClick={() => {
               const num = prompt('ادخل رقم العميل:');
               if (num) updateNumber(parseInt(num));
-            }} className="flex flex-col items-center p-4 bg-purple-50 text-purple-700 rounded-xl border border-purple-100 hover:bg-purple-100">
-              <Hash className="mb-2" /> رقم معين
+            }} className="flex flex-col items-center justify-center p-8 bg-purple-50 text-purple-700 rounded-[2rem] border-2 border-purple-100 hover:bg-purple-100 transition-all group">
+              <Hash size={48} className="mb-3 group-hover:scale-110 transition-transform" />
+              <span className="font-black">رقم مخصص</span>
             </button>
           </div>
-          <div className="grid grid-cols-2 gap-3 pt-4 border-t">
-             <button onClick={() => changeStatus('paused')} className={`flex items-center justify-center gap-2 p-3 rounded-lg ${selectedClinic?.status === 'paused' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-600 hover:bg-red-100'}`}>
-               <Pause size={18} /> توقف
+          <div className="grid grid-cols-2 gap-4 pt-6 border-t">
+             <button onClick={() => changeStatus('paused')} className={`flex items-center justify-center gap-2 p-5 rounded-2xl font-bold transition-all ${selectedClinic?.status === 'paused' ? 'bg-red-600 text-white shadow-lg' : 'bg-red-50 text-red-600'}`}>
+               <Pause /> توقف مؤقت
              </button>
-             <button onClick={() => changeStatus('active')} className={`flex items-center justify-center gap-2 p-3 rounded-lg ${selectedClinic?.status === 'active' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-600 hover:bg-green-100'}`}>
-               <Play size={18} /> استئناف
+             <button onClick={() => changeStatus('active')} className={`flex items-center justify-center gap-2 p-5 rounded-2xl font-bold transition-all ${selectedClinic?.status === 'active' ? 'bg-green-600 text-white shadow-lg' : 'bg-green-50 text-green-600'}`}>
+               <Play /> استئناف
              </button>
           </div>
         </section>
 
-        <section className="bg-white p-6 rounded-2xl shadow-sm space-y-4">
-          <h3 className="font-bold border-b pb-2 text-slate-500">تحويل ومراسلة</h3>
-          <div className="space-y-3">
-            <button className="w-full flex items-center gap-3 p-4 bg-slate-50 rounded-xl hover:bg-slate-100"><ArrowLeftRight size={20} className="text-blue-500" /> تحويل لعيادة أخرى</button>
-            <button className="w-full flex items-center gap-3 p-4 bg-slate-50 rounded-xl hover:bg-slate-100"><Send size={20} className="text-indigo-500" /> مراسلة الإدارة</button>
-          </div>
-        </section>
-
-        <section className="bg-white p-6 rounded-2xl shadow-sm space-y-4">
-          <h3 className="font-bold border-b pb-2 text-slate-500">تنبيهات الطوارئ</h3>
-          <div className="grid grid-cols-1 gap-2">
-            <button onClick={() => sendEmergency('حالة حريق!')} className="bg-red-600 text-white p-3 rounded-lg flex items-center justify-center gap-2 hover:bg-red-700"><AlertCircle /> حريق</button>
-            <button onClick={() => sendEmergency('تسرب غاز!')} className="bg-orange-600 text-white p-3 rounded-lg flex items-center justify-center gap-2 hover:bg-orange-700"><AlertCircle /> غاز</button>
-          </div>
-        </section>
-      </main>
-
-      <footer className="bg-white border-t p-4 h-48 overflow-y-auto">
-        <h4 className="font-bold text-slate-500 mb-2 flex items-center gap-2"><Bell size={16} /> التنبيهات والتحويلات الواردة</h4>
-        <div className="space-y-2">
-          {inboundNotifications.map((notif, i) => (
-            <div key={i} className={`p-3 rounded text-sm flex justify-between ${notif.type === 'emergency' ? 'bg-red-50 border-r-4 border-red-500' : 'bg-blue-50 border-r-4 border-blue-500'}`}>
-              <span>{notif.message} {notif.from_clinic ? `من ${notif.from_clinic}` : ''}</span>
-              <span className="text-slate-400">{new Date(notif.created_at).toLocaleTimeString('ar-EG')}</span>
+        {/* Communication */}
+        <section className="lg:col-span-4 bg-white p-8 rounded-[2.5rem] shadow-sm border space-y-6">
+          <h3 className="text-xl font-black text-slate-800 flex items-center gap-3">
+            <Send className="text-indigo-500" /> المراسلة والتنبيه
+          </h3>
+          <div className="space-y-6">
+            <div>
+              <label className="text-sm font-bold text-slate-500 mb-2 block">نداء باسم مريض:</label>
+              <div className="flex gap-2">
+                <input 
+                  type="text" 
+                  placeholder="اكتب اسم المريض هنا..." 
+                  className="flex-1 p-4 bg-slate-50 border-2 border-slate-100 rounded-2xl focus:border-indigo-500 outline-none transition-all font-bold" 
+                  value={customPatient}
+                  onChange={e => setCustomPatient(e.target.value)}
+                />
+                <button 
+                  onClick={() => { sendAlert('normal', `الرجاء من ${customPatient} التوجه للعيادة`); setCustomPatient(''); }}
+                  className="bg-indigo-600 text-white p-4 rounded-2xl hover:bg-indigo-700 shadow-lg shadow-indigo-100"
+                >
+                  <Send size={24} />
+                </button>
+              </div>
             </div>
-          ))}
-        </div>
-      </footer>
+            <button className="w-full flex items-center justify-between p-5 bg-slate-50 rounded-[1.5rem] hover:bg-slate-100 transition-colors font-bold border border-slate-100">
+              <div className="flex items-center gap-3"><ArrowLeftRight className="text-blue-500" /> تحويل مريض لعيادة أخرى</div>
+              <span className="bg-white p-1 rounded-lg border text-[10px] text-slate-400">قريباً</span>
+            </button>
+            <button onClick={() => sendAlert('normal', 'يرجى مراجعة العيادة للأهمية', true)} className="w-full flex items-center justify-between p-5 bg-slate-50 rounded-[1.5rem] hover:bg-slate-100 transition-colors font-bold border border-slate-100">
+              <div className="flex items-center gap-3"><Bell className="text-amber-500" /> إرسال إشعار للمدير</div>
+              <Send size={18} />
+            </button>
+            
+            <div className="pt-6 border-t space-y-3">
+              <p className="text-xs font-black text-slate-400 uppercase tracking-widest">تنبيهات الطوارئ</p>
+              <div className="grid grid-cols-2 gap-3">
+                <button onClick={() => sendAlert('emergency', 'حريق في العيادة')} className="bg-red-600 text-white p-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-red-700 shadow-lg shadow-red-100"><AlertCircle size={18} /> حريق</button>
+                <button onClick={() => sendAlert('emergency', 'حالة طبية طارئة')} className="bg-orange-500 text-white p-4 rounded-2xl font-bold flex items-center justify-center gap-2 hover:bg-orange-600 shadow-lg shadow-orange-100"><AlertCircle size={18} /> طوارئ</button>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        {/* Notifications Log */}
+        <section className="lg:col-span-4 bg-white p-8 rounded-[2.5rem] shadow-sm border flex flex-col h-[650px]">
+          <h3 className="text-xl font-black text-slate-800 flex items-center gap-3 mb-6">
+            <Bell className="text-amber-500" /> الإشعارات الواردة
+          </h3>
+          <div className="flex-1 overflow-y-auto space-y-4 pr-2">
+            {inboundNotifications.length === 0 ? (
+              <div className="flex flex-col items-center justify-center mt-20 text-slate-300">
+                <Bell size={64} className="mb-4 opacity-20" />
+                <p className="font-bold">لا توجد رسائل واردة</p>
+              </div>
+            ) : (
+              inboundNotifications.map((n, i) => (
+                <div key={i} className={`p-5 rounded-3xl border-r-8 shadow-sm transition-all animate-slideIn ${n.type === 'emergency' ? 'bg-red-50 border-red-500' : 'bg-blue-50 border-blue-500'}`}>
+                   <p className="font-bold text-slate-800">{n.message}</p>
+                   <div className="flex justify-between mt-3">
+                     <span className="text-[10px] font-black text-slate-400 uppercase tracking-tighter">{n.from_clinic || 'النظام'}</span>
+                     <span className="text-[10px] text-slate-400 font-bold">{new Date(n.created_at).toLocaleTimeString('ar-EG')}</span>
+                   </div>
+                </div>
+              ))
+            )}
+          </div>
+        </section>
+
+      </main>
     </div>
   );
 };

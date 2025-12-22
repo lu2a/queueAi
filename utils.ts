@@ -22,35 +22,40 @@ export const playCallSequence = async (patientNumber: number, clinicNumber: numb
   }
 
   // 2. رقم المريض
-  // تأكد من وجود ملفات بأسماء 1.mp3, 2.mp3 في المجلد
   audioFiles.push(`/audio/${patientNumber}.mp3`);
   
   // 3. رقم العيادة
-  // تأكد من وجود ملفات بأسماء clinic1.mp3, clinic2.mp3 في المجلد
   audioFiles.push(`/audio/clinic${clinicNumber}.mp3`);
+
+  console.log("Starting sequence:", audioFiles);
 
   // تشغيل الملفات بالتتابع
   for (const src of audioFiles) {
     try {
-      await new Promise((resolve, reject) => {
+      await new Promise((resolve) => {
         const audio = new Audio(src);
         audio.onended = resolve;
-        audio.onerror = () => {
-          console.warn(`Audio file not found or failed to load: ${src}`);
-          resolve(null); // تجاوز الملف إذا فشل تحميله
+        audio.onerror = (e) => {
+          console.warn(`File not found: ${src}`, e);
+          resolve(null); 
         };
-        audio.play().catch(e => {
-          console.error("Autoplay prevented or playback error:", e);
-          resolve(null);
-        });
+        const playPromise = audio.play();
+        if (playPromise !== undefined) {
+          playPromise.catch(error => {
+            console.error("Playback failed. User interaction might be needed.", error);
+            resolve(null);
+          });
+        }
       });
     } catch (err) {
-      console.error("Audio sequence error:", err);
+      console.error("Audio step error:", err);
     }
   }
 };
 
 export const playSimpleSound = (src: string) => {
   const audio = new Audio(src);
-  audio.play().catch(e => console.error("Audio play failed (Autoplay policy?):", e));
+  audio.play().catch(e => {
+    console.warn("Simple sound play failed. Check file at:", src, e);
+  });
 };

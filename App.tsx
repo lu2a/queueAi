@@ -7,6 +7,7 @@ import Home from './pages/Home';
 import ControlPanel from './pages/ControlPanel';
 import DisplayScreen from './pages/DisplayScreen';
 import AdminPanel from './pages/AdminPanel';
+import FollowUp from './pages/FollowUp';
 
 const App: React.FC = () => {
   return (
@@ -17,6 +18,7 @@ const App: React.FC = () => {
           <Route path="/control" element={<ControlPanel />} />
           <Route path="/display" element={<DisplayScreen />} />
           <Route path="/admin" element={<AdminPanel />} />
+          <Route path="/follow-up" element={<FollowUp />} />
         </Routes>
       </div>
     </Router>

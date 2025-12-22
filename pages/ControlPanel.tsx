@@ -21,7 +21,6 @@ const ControlPanel: React.FC = () => {
     return () => clearInterval(timer);
   }, []);
 
-  // الاستماع للتغييرات في العيادة المختارة لضمان مزامنة البيانات
   useEffect(() => {
     if (isLoggedIn && selectedClinic) {
       const clinicSub = subscribeToChanges('clinics', (payload) => {
@@ -42,7 +41,7 @@ const ControlPanel: React.FC = () => {
 
       return () => { 
         supabase.removeChannel(clinicSub); 
-        supabase.removeChannel(notifSub); 
+        notifSub.unsubscribe();
       };
     }
   }, [isLoggedIn, selectedClinic?.id]);
@@ -66,21 +65,19 @@ const ControlPanel: React.FC = () => {
   const updateNumber = async (num: number) => {
     if (!selectedClinic) return;
     
-    // تحديث قاعدة البيانات أولاً
+    // تم حذف last_called_at لضمان التوافق مع قاعدة البيانات الحالية
     const { error } = await supabase
       .from('clinics')
       .update({ 
-        current_number: num, 
-        last_called_at: new Date().toISOString() 
+        current_number: num
       })
       .eq('id', selectedClinic.id);
 
     if (!error) {
-      // تشغيل النطق للطبيب فوراً عند الضغط
       playCallSequence(num, selectedClinic.number);
     } else {
       console.error("Update error:", error);
-      alert("فشل تحديث الرقم في قاعدة البيانات");
+      alert("فشل تحديث الرقم: تأكد من وجود صلاحيات التحديث (RLS) للجدول");
     }
   };
 
@@ -108,7 +105,6 @@ const ControlPanel: React.FC = () => {
               <LogOut size={40} className="rotate-180" />
             </div>
             <h2 className="text-3xl font-black text-slate-800">دخول العيادة</h2>
-            <p className="text-slate-400 text-sm mt-1">الرجاء اختيار العيادة وكلمة السر</p>
           </div>
           <form onSubmit={handleLogin} className="space-y-6">
             <div>

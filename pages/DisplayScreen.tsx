@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Maximize, Settings as SettingsIcon, Bell, Clock, Calendar, X } from 'lucide-react';
+import { Maximize, Settings as SettingsIcon, Bell, Clock, Calendar, X, Volume2 } from 'lucide-react';
 import { toHindiDigits, playCallSequence, playSimpleSound } from '../utils';
 import { Clinic, SystemSettings, Notification } from '../types';
 import { supabase, subscribeToChanges } from '../supabase';
@@ -13,6 +13,7 @@ const DisplayScreen: React.FC = () => {
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [notification, setNotification] = useState<string | null>(null);
   const [showConfig, setShowConfig] = useState(false);
+  const [audioReady, setAudioReady] = useState(false);
 
   // Advanced Layout Config
   const [config, setConfig] = useState({
@@ -33,7 +34,7 @@ const DisplayScreen: React.FC = () => {
         setClinics(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
         if (payload.old && payload.new.current_number !== payload.old.current_number) {
           setNotification(`على العميل رقم ${toHindiDigits(payload.new.current_number)} التوجه لـ ${payload.new.name}`);
-          playCallSequence(payload.new.current_number, payload.new.number);
+          if (audioReady) playCallSequence(payload.new.current_number, payload.new.number);
           setTimeout(() => setNotification(null), 10000);
         }
       } else {
@@ -45,7 +46,7 @@ const DisplayScreen: React.FC = () => {
       const newNotif = payload.new as Notification;
       if (newNotif.type === 'emergency') {
         setNotification(`تنبيه طارئ: ${newNotif.message}`);
-        playSimpleSound('/audio/emergency.mp3');
+        if (audioReady) playSimpleSound('/audio/emergency.mp3');
         setTimeout(() => setNotification(null), 15000);
       }
     });
@@ -53,15 +54,22 @@ const DisplayScreen: React.FC = () => {
     return () => {
       clearInterval(timer);
       supabase.removeChannel(clinicSub);
-      supabase.removeChannel(notifSub);
+      notifSub.unsubscribe();
     };
-  }, []);
+  }, [audioReady]);
 
   const fetchInitialData = async () => {
     const { data: s } = await supabase.from('settings').select('*').single();
     if (s) setSettings(s);
     const { data: c } = await supabase.from('clinics').select('*').order('number');
     if (c) setClinics(c);
+  };
+
+  const handleStartDisplay = () => {
+    setIsLoggedIn(true);
+    setAudioReady(true);
+    // تشغيل صوت صامت لتفعيل سياسة المتصفح
+    playSimpleSound('/audio/ding.mp3');
   };
 
   const toggleFullScreen = () => {
@@ -95,16 +103,26 @@ const DisplayScreen: React.FC = () => {
   if (!isLoggedIn) {
     return (
       <div className="flex-1 flex items-center justify-center bg-slate-900">
-        <div className="bg-white p-8 rounded-2xl shadow-2xl w-80">
-          <h2 className="text-xl font-bold mb-4 text-center">دخول الشاشة</h2>
-          <input 
-            type="password" 
-            placeholder="كلمة السر" 
-            className="w-full p-3 border rounded mb-4 text-center"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-          <button onClick={() => setIsLoggedIn(true)} className="w-full bg-blue-600 text-white py-3 rounded font-bold">تفعيل العرض</button>
+        <div className="bg-white p-10 rounded-[2.5rem] shadow-2xl w-96">
+          <h2 className="text-2xl font-black mb-6 text-center text-slate-800">تفعيل الشاشة</h2>
+          <div className="space-y-4">
+            <input 
+              type="password" 
+              placeholder="كلمة سر الشاشة" 
+              className="w-full p-4 border-2 rounded-2xl text-center font-bold outline-none focus:border-blue-600"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+            />
+            <button 
+              onClick={handleStartDisplay} 
+              className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black text-lg flex items-center justify-center gap-3 shadow-xl shadow-blue-100"
+            >
+              <Volume2 /> تشغيل العرض والصوت
+            </button>
+          </div>
+          <p className="text-xs text-slate-400 mt-6 text-center leading-relaxed">
+            يجب الضغط على الزر لتفعيل نظام النطق الصوتي حسب سياسات المتصفح.
+          </p>
         </div>
       </div>
     );
@@ -147,7 +165,15 @@ const DisplayScreen: React.FC = () => {
         </div>
 
         <div className={`${getVideoWidth()} bg-black flex items-center justify-center relative`}>
-          <video className="w-full h-full object-cover opacity-70" autoPlay muted loop src="https://www.w3schools.com/html/mov_bbb.mp4" />
+          {/* تأكد من وضع الفيديو في المسار: /videos/display.mp4 */}
+          <video 
+            className="w-full h-full object-cover opacity-70" 
+            autoPlay 
+            muted 
+            loop 
+            src="/videos/display.mp4" 
+            onError={(e) => console.log("Video not found at /videos/display.mp4")}
+          />
           {notification && (
             <div className="absolute inset-0 flex items-center justify-center p-10 bg-black/40">
               <div className="bg-white border-8 border-blue-600 rounded-[3rem] p-12 shadow-2xl animate-bounce text-center max-w-2xl">
@@ -177,7 +203,7 @@ const DisplayScreen: React.FC = () => {
             <div className="grid grid-cols-2 gap-6">
               <div className="space-y-2">
                 <label className="text-sm font-bold block">مساحة الكروت</label>
-                <select className="w-full p-3 border rounded-xl" value={config.layoutSplit} onChange={e => setConfig({...config, layoutSplit: e.target.value})}>
+                <select className="w-full p-3 border rounded-xl" value={config.layoutSplit} onChange={e => setConfig({...config, layoutSplit: e.target.value as any})}>
                   <option value="1/4">الربع (1/4)</option>
                   <option value="1/3">الثلث (1/3)</option>
                   <option value="1/2">النصف (1/2)</option>
@@ -206,7 +232,7 @@ const DisplayScreen: React.FC = () => {
               </div>
             </div>
 
-            <button onClick={() => setShowConfig(false)} className="w-full mt-8 bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg shadow-blue-200">تطبيق الإعدادات</button>
+            <button onClick={() => setShowConfig(false)} className="w-full mt-8 bg-blue-600 text-white py-4 rounded-2xl font-bold shadow-lg">تطبيق الإعدادات</button>
           </div>
         </div>
       )}

@@ -4,7 +4,7 @@ import {
   Settings, Users, Tv, Stethoscope, Trash2, Edit, Plus, RefreshCw, Send, 
   Volume2, AlertCircle, Play, Pause, Repeat, Hash, SkipBack, 
   UserPlus, Bell, Printer, Save, MessageSquare, Mic, ShieldAlert, X,
-  Activity, Zap, Flame, Droplets, Calendar, Clock, ArrowLeftRight
+  Activity, Zap, Flame, Droplets, Calendar, Clock, ArrowLeftRight, Check
 } from 'lucide-react';
 import { toHindiDigits, playSimpleSound, playCallSequence } from '../utils';
 import { supabase, subscribeToChanges } from '../supabase';
@@ -18,6 +18,9 @@ const AdminPanel: React.FC = () => {
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [adminNotifications, setAdminNotifications] = useState<Notification[]>([]);
   
+  const [showAddClinicModal, setShowAddClinicModal] = useState(false);
+  const [newClinic, setNewClinic] = useState({ name: '', number: '', linked_screens: [] as string[] });
+
   // Remote Control Logic
   const [targetClinicId, setTargetClinicId] = useState<string>('');
   const [remoteCustomName, setRemoteCustomName] = useState('');
@@ -55,8 +58,12 @@ const AdminPanel: React.FC = () => {
 
   const deleteItem = async (table: string, id: string) => {
     if (confirm('هل أنت متأكد من الحذف؟')) {
-      await supabase.from(table).delete().eq('id', id);
-      fetchData();
+      const { error } = await supabase.from(table).delete().eq('id', id);
+      if (error) {
+        alert("فشل الحذف. قد يكون هناك سجلات مرتبطة.");
+      } else {
+        fetchData();
+      }
     }
   };
 
@@ -95,7 +102,36 @@ const AdminPanel: React.FC = () => {
     fetchData();
   };
 
-  // Fix: Added handlePrint function to trigger browser print dialog
+  const handleAddClinic = async () => {
+    if (!newClinic.name || !newClinic.number) return alert('يرجى إدخال الاسم والرقم');
+    const { error } = await supabase.from('clinics').insert({
+      name: newClinic.name,
+      number: parseInt(newClinic.number),
+      status: 'active',
+      password: '123',
+      current_number: 0,
+      linked_screens: newClinic.linked_screens
+    });
+    if (error) {
+      alert("خطأ في الإضافة: " + error.message);
+    } else {
+      setShowAddClinicModal(false);
+      setNewClinic({ name: '', number: '', linked_screens: [] });
+      fetchData();
+    }
+  };
+
+  const toggleScreenLink = (screenId: string) => {
+    setNewClinic(prev => {
+      const exists = prev.linked_screens.includes(screenId);
+      if (exists) {
+        return { ...prev, linked_screens: prev.linked_screens.filter(id => id !== screenId) };
+      } else {
+        return { ...prev, linked_screens: [...prev.linked_screens, screenId] };
+      }
+    });
+  };
+
   const handlePrint = () => {
     window.print();
   };
@@ -137,7 +173,7 @@ const AdminPanel: React.FC = () => {
 
         {activeTab === 'clinics' && (
           <div className="space-y-6 animate-fadeIn">
-            <div className="flex justify-between items-center"><h3 className="text-3xl font-black">إدارة العيادات</h3><button onClick={async () => { const name = prompt('اسم العيادة:'); if(name) { await supabase.from('clinics').insert({ name, number: clinics.length+1, status:'active', password:'123', current_number:0 }); fetchData(); } }} className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2"><Plus /> إضافة عيادة</button></div>
+            <div className="flex justify-between items-center"><h3 className="text-3xl font-black">إدارة العيادات</h3><button onClick={() => setShowAddClinicModal(true)} className="bg-emerald-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2"><Plus /> إضافة عيادة</button></div>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
               {clinics.map(c => (
                 <div key={c.id} className="bg-white p-6 rounded-3xl border shadow-sm">
@@ -174,6 +210,24 @@ const AdminPanel: React.FC = () => {
            </div>
         )}
 
+        {activeTab === 'screens' && (
+           <div className="space-y-6 animate-fadeIn">
+             <div className="flex justify-between items-center"><h3 className="text-3xl font-black">إدارة الشاشات</h3><button onClick={async () => { const name = prompt('اسم الشاشة:'); if(name) { await supabase.from('screens').insert({ name, password: '123', number: screens.length+1 }); fetchData(); } }} className="bg-blue-600 text-white px-6 py-3 rounded-xl font-bold flex items-center gap-2"><Plus /> إضافة شاشة</button></div>
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+               {screens.map(s => (
+                 <div key={s.id} className="bg-white p-6 rounded-3xl border shadow-sm">
+                   <div className="flex justify-between items-start mb-4">
+                     <div className="p-3 bg-blue-50 text-blue-600 rounded-xl"><Tv size={24}/></div>
+                     <button onClick={() => deleteItem('screens', s.id)} className="text-red-400 hover:text-red-600"><Trash2 size={18}/></button>
+                   </div>
+                   <h4 className="text-xl font-black mb-1">{s.name}</h4>
+                   <p className="text-xs font-bold text-slate-400 mb-4">الرقم: #{s.number} | كلمة السر: {s.password}</p>
+                 </div>
+               ))}
+             </div>
+           </div>
+        )}
+
         {activeTab === 'remote' && (
           <div className="space-y-8 animate-fadeIn">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -186,7 +240,6 @@ const AdminPanel: React.FC = () => {
             
             {selectedRemoteClinic ? (
               <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* نفس قسم تحكم الطبيب */}
                 <div className="bg-white p-8 rounded-[2.5rem] border shadow-sm space-y-6">
                     <h4 className="font-black text-lg border-b pb-2 flex items-center justify-between">التحكم في الطابور <span className="bg-emerald-600 text-white px-3 py-1 rounded-full text-sm">{toHindiDigits(selectedRemoteClinic.current_number)}</span></h4>
                     <div className="grid grid-cols-2 gap-4">
@@ -250,7 +303,6 @@ const AdminPanel: React.FC = () => {
               </div>
               <button onClick={handlePrint} className="w-full bg-slate-900 text-white py-5 rounded-2xl font-black text-xl flex items-center justify-center gap-4 hover:scale-[1.01] transition-all"><Printer size={32}/> طباعة الدفعة</button>
             </div>
-            {/* عرض التذاكر للطباعة */}
             <div className="print-grid-container bg-white w-[21cm] mx-auto min-h-[29.7cm] p-4 hidden print:block">
                <div className="grid grid-cols-4 gap-2">
                   {Array.from({ length: Math.max(0, printRange.to - printRange.from + 1) }).map((_, idx) => {
@@ -287,6 +339,56 @@ const AdminPanel: React.FC = () => {
             }
          </div>
       </aside>
+
+      {/* Modal إضافة عيادة */}
+      {showAddClinicModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div className="bg-white rounded-[2rem] p-8 max-w-lg w-full">
+            <h3 className="text-2xl font-black mb-6">إضافة عيادة جديدة</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="text-sm font-bold text-slate-500 block mb-1">اسم العيادة</label>
+                <input 
+                  className="w-full p-4 border rounded-xl font-bold" 
+                  placeholder="مثال: عيادة الباطنة"
+                  value={newClinic.name} 
+                  onChange={e => setNewClinic({...newClinic, name: e.target.value})} 
+                />
+              </div>
+              <div>
+                <label className="text-sm font-bold text-slate-500 block mb-1">رقم العيادة</label>
+                <input 
+                  type="number"
+                  className="w-full p-4 border rounded-xl font-bold" 
+                  placeholder="مثال: 1"
+                  value={newClinic.number} 
+                  onChange={e => setNewClinic({...newClinic, number: e.target.value})} 
+                />
+              </div>
+              <div>
+                <label className="text-sm font-bold text-slate-500 block mb-1">ربط بالشاشات</label>
+                <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border p-2 rounded-xl">
+                  {screens.map(s => (
+                    <button 
+                      key={s.id} 
+                      onClick={() => toggleScreenLink(s.id)}
+                      className={`p-2 rounded-lg text-sm font-bold flex items-center justify-between border transition-all ${newClinic.linked_screens.includes(s.id) ? 'bg-emerald-50 border-emerald-500 text-emerald-700' : 'bg-slate-50 text-slate-500 border-slate-200'}`}
+                    >
+                      {s.name}
+                      {newClinic.linked_screens.includes(s.id) && <Check size={14}/>}
+                    </button>
+                  ))}
+                  {screens.length === 0 && <p className="col-span-2 text-xs text-slate-400 text-center py-2">لا توجد شاشات مسجلة</p>}
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-4 mt-8">
+              <button onClick={handleAddClinic} className="flex-1 bg-emerald-600 text-white p-4 rounded-xl font-black">إضافة</button>
+              <button onClick={() => setShowAddClinicModal(false)} className="flex-1 bg-slate-100 text-slate-500 p-4 rounded-xl font-black">إلغاء</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

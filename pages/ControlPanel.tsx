@@ -16,11 +16,9 @@ const ControlPanel: React.FC = () => {
   const [password, setPassword] = useState('');
   const [currentTime, setCurrentTime] = useState(new Date());
   
-  // سجلات النشاط
   const [inboundLogs, setInboundLogs] = useState<Notification[]>([]);
   const [outboundLogs, setOutboundLogs] = useState<Notification[]>([]);
   
-  // مدخلات
   const [customName, setCustomName] = useState('');
   const [manualCallNum, setManualCallNum] = useState('');
   const [transferTarget, setTransferTarget] = useState('');
@@ -89,7 +87,6 @@ const ControlPanel: React.FC = () => {
     } else { alert('كلمة السر خاطئة'); }
   };
 
-  // وظائف التحكم
   const updateNumber = async (num: number) => {
     if (!selectedClinic) return;
     const { error } = await supabase.from('clinics').update({ current_number: num }).eq('id', selectedClinic.id);
@@ -125,6 +122,15 @@ const ControlPanel: React.FC = () => {
       to_admin: true
     });
     playSimpleSound('/audio/emergency.mp3');
+  };
+
+  // وظيفة لتحديث حالة العيادة بشكل صحيح
+  const handleStatusChange = async (newStatus: 'active' | 'paused') => {
+    if (!selectedClinic) return;
+    const { error } = await supabase.from('clinics').update({ status: newStatus }).eq('id', selectedClinic.id);
+    if (error) {
+      alert("خطأ في تحديث الحالة");
+    }
   };
 
   if (!isLoggedIn) {
@@ -170,7 +176,6 @@ const ControlPanel: React.FC = () => {
       </header>
 
       <main className="flex-1 p-6 grid grid-cols-1 xl:grid-cols-12 gap-6 w-full max-w-[1800px] mx-auto overflow-y-auto">
-        {/* عمود التحكم الرئيسي */}
         <div className="xl:col-span-4 space-y-6">
           <section className="bg-white p-6 rounded-[2.5rem] border shadow-sm space-y-4">
             <h3 className="text-lg font-black flex items-center gap-2 text-emerald-600"><Activity size={18}/> التحكم في الطابور</h3>
@@ -184,8 +189,8 @@ const ControlPanel: React.FC = () => {
               </div>
             </div>
             <div className="flex gap-2 pt-2">
-              <button onClick={() => supabase.from('clinics').update({status: 'paused'}).eq('id', selectedClinic?.id)} className={`flex-1 p-3 rounded-xl font-bold flex items-center justify-center gap-2 ${selectedClinic?.status === 'paused' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-600 border'}`}><Pause size={16}/> توقف</button>
-              <button onClick={() => supabase.from('clinics').update({status: 'active'}).eq('id', selectedClinic?.id)} className={`flex-1 p-3 rounded-xl font-bold flex items-center justify-center gap-2 ${selectedClinic?.status === 'active' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-600 border'}`}><Play size={16}/> استئناف</button>
+              <button onClick={() => handleStatusChange('paused')} className={`flex-1 p-3 rounded-xl font-bold flex items-center justify-center gap-2 ${selectedClinic?.status === 'paused' ? 'bg-red-600 text-white' : 'bg-red-50 text-red-600 border'}`}><Pause size={16}/> توقف</button>
+              <button onClick={() => handleStatusChange('active')} className={`flex-1 p-3 rounded-xl font-bold flex items-center justify-center gap-2 ${selectedClinic?.status === 'active' ? 'bg-green-600 text-white' : 'bg-green-50 text-green-600 border'}`}><Play size={16}/> استئناف</button>
             </div>
           </section>
 
@@ -205,7 +210,6 @@ const ControlPanel: React.FC = () => {
           </section>
         </div>
 
-        {/* عمود المراسلة والطوارئ */}
         <div className="xl:col-span-4 space-y-6">
           <section className="bg-white p-6 rounded-[2.5rem] border shadow-sm space-y-4">
             <h3 className="text-lg font-black flex items-center gap-2 text-indigo-600"><MessageSquare size={18}/> المراسلة والنداء</h3>
@@ -250,7 +254,6 @@ const ControlPanel: React.FC = () => {
           </section>
         </div>
 
-        {/* عمود سجل النشاط */}
         <div className="xl:col-span-4 flex flex-col gap-6">
            <section className="bg-white p-6 rounded-[2.5rem] border shadow-sm flex-1 flex flex-col overflow-hidden">
               <h3 className="text-lg font-black mb-4 border-b pb-2 flex items-center justify-between">
@@ -260,7 +263,7 @@ const ControlPanel: React.FC = () => {
                  <div className="space-y-2">
                     <p className="text-[10px] font-black text-slate-400 uppercase border-b border-slate-50 pb-1">الواردة (Inbound)</p>
                     {inboundLogs.map((n, i) => (
-                      <div key={i} className={`p-3 rounded-xl border-r-4 text-xs font-bold ${n.type === 'emergency' ? 'bg-red-50 border-red-500 animate-shake' : 'bg-blue-50 border-blue-500'}`}>
+                      <div key={i} className={`p-3 rounded-xl border-r-4 text-xs font-bold ${n.type === 'emergency' ? 'bg-red-50 border-red-500 animate-shake' : 'bg-blue-50 border-blue-600'}`}>
                         <div className="flex justify-between mb-1 opacity-50 text-[9px]"><span>{n.from_clinic || 'النظام'}</span><span>{new Date(n.created_at).toLocaleTimeString('ar-EG')}</span></div>
                         {n.message}
                       </div>

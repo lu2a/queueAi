@@ -19,6 +19,9 @@ const ControlPanel: React.FC = () => {
   const [inboundLogs, setInboundLogs] = useState<Notification[]>([]);
   const [outboundLogs, setOutboundLogs] = useState<Notification[]>([]);
   
+  // الحالة الجديدة للتنبيه المنبثق
+  const [activeNotif, setActiveNotif] = useState<Notification | null>(null);
+  
   const [customName, setCustomName] = useState('');
   const [manualCallNum, setManualCallNum] = useState('');
   const [transferTarget, setTransferTarget] = useState('');
@@ -46,7 +49,10 @@ const ControlPanel: React.FC = () => {
         const n = payload.new as Notification;
         if (n.to_clinic === selectedClinic.id || n.type === 'emergency') {
           setInboundLogs(prev => [n, ...prev]);
-          playSimpleSound('/audio/ring.mp3');
+          // تفعيل التنبيه المنبثق وصوت Ding
+          setActiveNotif(n);
+          playSimpleSound('/audio/ding.mp3');
+          setTimeout(() => setActiveNotif(null), 6000);
         }
         if (n.from_clinic === selectedClinic.name) {
           setOutboundLogs(prev => [n, ...prev]);
@@ -130,6 +136,14 @@ const ControlPanel: React.FC = () => {
     if (error) alert("فشل تحديث الحالة");
   };
 
+  const getNotifClass = (type: string) => {
+    switch(type) {
+      case 'emergency': return 'border-red-600 notification-red';
+      case 'transfer': return 'border-blue-600 notification-blue';
+      default: return 'border-green-600 notification-green';
+    }
+  };
+
   if (!isLoggedIn) {
     return (
       <div className="flex-1 flex items-center justify-center bg-slate-900 font-cairo">
@@ -149,7 +163,25 @@ const ControlPanel: React.FC = () => {
   }
 
   return (
-    <div className="flex-1 flex flex-col bg-slate-50 min-h-screen font-cairo overflow-hidden">
+    <div className="flex-1 flex flex-col bg-slate-50 min-h-screen font-cairo overflow-hidden relative">
+      {/* تنبيه الجرس الجديد (نمط فيسبوك) */}
+      {activeNotif && (
+        <div className="fixed top-6 left-6 z-[100] animate-shake">
+          <div className={`flex items-center gap-4 p-5 rounded-[2rem] shadow-2xl border-4 bg-white ${getNotifClass(activeNotif.type)}`}>
+             <div className="relative">
+                <div className="bg-slate-100 p-3 rounded-2xl">
+                  <Bell size={32} className="animate-bounce text-slate-700" />
+                </div>
+                <span className="absolute -top-1 -right-1 bg-red-600 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center animate-ping"></span>
+             </div>
+             <div className="max-w-xs">
+                <p className="text-sm font-black text-slate-800 leading-tight">{activeNotif.message}</p>
+                <p className="text-[10px] font-bold text-slate-400 mt-1">من: {activeNotif.from_clinic || 'النظام'}</p>
+             </div>
+          </div>
+        </div>
+      )}
+
       <header className="bg-white border-b-4 p-6 flex justify-between items-center px-10 shadow-md sticky top-0 z-30">
         <div className="flex items-center gap-6">
           <div className={`p-4 px-8 rounded-3xl font-black text-5xl shadow-xl ${selectedClinic?.status === 'active' ? 'bg-emerald-600 text-white animate-pulse' : 'bg-red-600 text-white'}`}>

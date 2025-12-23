@@ -18,6 +18,9 @@ const AdminPanel: React.FC = () => {
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [adminNotifications, setAdminNotifications] = useState<Notification[]>([]);
   
+  // الحالة الجديدة للتنبيه المنبثق
+  const [activeNotif, setActiveNotif] = useState<Notification | null>(null);
+  
   const [showAddClinicModal, setShowAddClinicModal] = useState(false);
   const [newClinic, setNewClinic] = useState({ name: '', number: '', linked_screens: [] as string[] });
 
@@ -35,7 +38,10 @@ const AdminPanel: React.FC = () => {
       const n = payload.new as Notification;
       if (n.to_admin || n.type === 'emergency') {
         setAdminNotifications(prev => [n, ...prev]);
-        playSimpleSound('/audio/ring.mp3');
+        // تفعيل التنبيه المنبثق وصوت Ding
+        setActiveNotif(n);
+        playSimpleSound('/audio/ding.mp3');
+        setTimeout(() => setActiveNotif(null), 6000);
       }
     });
     return () => { supabase.removeChannel(sub); };
@@ -134,10 +140,36 @@ const AdminPanel: React.FC = () => {
     window.print();
   };
 
+  const getNotifClass = (type: string) => {
+    switch(type) {
+      case 'emergency': return 'border-red-600 notification-red';
+      case 'transfer': return 'border-blue-600 notification-blue';
+      default: return 'border-blue-600 notification-blue'; // التنبيهات الإدارية زرقاء
+    }
+  };
+
   const selectedRemoteClinic = clinics.find(c => c.id === targetClinicId);
 
   return (
-    <div className="flex-1 flex flex-col md:flex-row bg-slate-50 min-h-screen overflow-hidden print:bg-white font-cairo">
+    <div className="flex-1 flex flex-col md:flex-row bg-slate-50 min-h-screen overflow-hidden print:bg-white font-cairo relative">
+      {/* تنبيه الجرس الجديد (نمط فيسبوك) للوحة المدير */}
+      {activeNotif && (
+        <div className="fixed top-6 left-6 z-[100] animate-shake">
+          <div className={`flex items-center gap-4 p-5 rounded-[2rem] shadow-2xl border-4 bg-white ${getNotifClass(activeNotif.type)}`}>
+             <div className="relative">
+                <div className="bg-slate-100 p-3 rounded-2xl">
+                  <Bell size={32} className="animate-bounce text-slate-700" />
+                </div>
+                <span className="absolute -top-1 -right-1 bg-red-600 w-4 h-4 rounded-full border-2 border-white flex items-center justify-center animate-ping"></span>
+             </div>
+             <div className="max-w-xs">
+                <p className="text-sm font-black text-slate-800 leading-tight">{activeNotif.message}</p>
+                <p className="text-[10px] font-bold text-slate-400 mt-1">من: {activeNotif.from_clinic || 'النظام'}</p>
+             </div>
+          </div>
+        </div>
+      )}
+
       <aside className="w-full md:w-72 bg-slate-900 text-slate-300 p-6 space-y-2 shrink-0 print:hidden overflow-y-auto shadow-2xl">
         <h2 className="text-2xl font-black text-white mb-10 px-2 flex items-center gap-3"><ShieldAlert className="text-blue-500" /> لوحة المدير</h2>
         <nav className="space-y-1">

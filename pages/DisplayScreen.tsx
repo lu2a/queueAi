@@ -18,6 +18,9 @@ const DisplayScreen: React.FC = () => {
   const [activeNotification, setActiveNotification] = useState<{ msg: string; type: string } | null>(null);
   const [showConfig, setShowConfig] = useState(false);
   const [audioReady, setAudioReady] = useState(false);
+  
+  // حالة فهرس الفيديو الحالي
+  const [currentVideoIndex, setCurrentVideoIndex] = useState(1);
 
   const [config, setConfig] = useState({
     cardWidthPercent: 100,
@@ -198,7 +201,14 @@ const DisplayScreen: React.FC = () => {
         {/* قسم الفيديو والإشعارات */}
         {config.showVideo && (
           <div className="flex-1 bg-black flex items-center justify-center relative transition-all duration-500">
-            <video className="w-full h-full object-cover opacity-60" autoPlay muted loop src="/videos/display.mp4" />
+            <video 
+              className="w-full h-full object-cover opacity-60" 
+              autoPlay 
+              muted 
+              src={`/videos/${currentVideoIndex}.mp4`} 
+              onEnded={() => setCurrentVideoIndex(prev => prev >= 50 ? 1 : prev + 1)}
+              onError={() => setCurrentVideoIndex(prev => prev >= 50 ? 1 : prev + 1)}
+            />
             
             {activeNotification && (
               <div className="absolute top-10 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-50">

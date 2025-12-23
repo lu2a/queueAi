@@ -23,10 +23,8 @@ const AdminPanel: React.FC = () => {
 
   // Remote Control Logic
   const [targetClinicId, setTargetClinicId] = useState<string>('');
-  const [remoteCustomName, setRemoteCustomName] = useState('');
-  const [remoteManualNum, setRemoteManualNum] = useState('');
-  const [remoteTransferTarget, setRemoteTransferTarget] = useState('');
   const [remoteMsgText, setRemoteMsgText] = useState('');
+  const [remoteTransferTarget, setRemoteTransferTarget] = useState('');
 
   const [printClinicId, setPrintClinicId] = useState('');
   const [printRange, setPrintRange] = useState({ from: 1, to: 20 });
@@ -323,23 +321,6 @@ const AdminPanel: React.FC = () => {
         )}
       </main>
 
-      <aside className="w-80 bg-white border-l p-6 hidden xl:flex flex-col print:hidden shadow-xl">
-         <h4 className="font-black text-xl mb-6 flex items-center gap-3"><Bell className="text-blue-500" /> تنبيهات المدير</h4>
-         <div className="flex-1 overflow-y-auto space-y-4 pr-2 scrollbar-hide">
-            {adminNotifications.length === 0 ? <p className="text-center text-slate-300 mt-20 italic">لا توجد رسائل حالياً</p> :
-              adminNotifications.map((n, i) => (
-                <div key={i} className={`p-4 rounded-2xl border-r-8 shadow-sm transition-all ${n.type === 'emergency' ? 'bg-red-50 border-red-500 animate-shake' : 'bg-blue-50 border-blue-600'}`}>
-                  <p className="font-black text-slate-800 text-sm">{n.message}</p>
-                  <div className="flex justify-between mt-2 text-[10px] font-bold text-slate-400">
-                    <span className="uppercase">{n.from_clinic || 'النظام'}</span>
-                    <span>{new Date(n.created_at).toLocaleTimeString('ar-EG')}</span>
-                  </div>
-                </div>
-              ))
-            }
-         </div>
-      </aside>
-
       {/* Modal إضافة عيادة */}
       {showAddClinicModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
@@ -378,7 +359,6 @@ const AdminPanel: React.FC = () => {
                       {newClinic.linked_screens.includes(s.id) && <Check size={14}/>}
                     </button>
                   ))}
-                  {screens.length === 0 && <p className="col-span-2 text-xs text-slate-400 text-center py-2">لا توجد شاشات مسجلة</p>}
                 </div>
               </div>
             </div>

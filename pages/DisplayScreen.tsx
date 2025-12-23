@@ -24,7 +24,7 @@ const DisplayScreen: React.FC = () => {
     cardHeightPx: 160,
     fontSizeRem: 3.5,
     columns: 2,
-    layoutSplitPercent: 33, // مساحة جزء الكروت من 25% إلى 100%
+    layoutSplitPercent: 33, 
     showVideo: true,
     themeColor: '#2563eb',
     cardBg: '#ffffff',
@@ -42,12 +42,8 @@ const DisplayScreen: React.FC = () => {
       if (payload.eventType === 'UPDATE') {
         setClinics(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
         if (payload.old && payload.new.current_number !== payload.old.current_number) {
-          setActiveNotification({ 
-            msg: `على العميل رقم ${toHindiDigits(payload.new.current_number)} التوجه لـ ${payload.new.name}`, 
-            type: 'normal' 
-          });
+          triggerNotification(`على العميل رقم ${toHindiDigits(payload.new.current_number)} التوجه لـ ${payload.new.name}`, 'normal');
           if (audioReady) playCallSequence(payload.new.current_number, payload.new.number);
-          setTimeout(() => setActiveNotification(null), 8000);
         }
       } else { fetchInitialData(); }
     });
@@ -55,17 +51,14 @@ const DisplayScreen: React.FC = () => {
     const notifSub = subscribeToChanges('notifications', (payload) => {
       const n = payload.new as Notification;
       if (n.type === 'emergency') {
-        setActiveNotification({ msg: `تنبيه طارئ: ${n.message}`, type: 'emergency' });
+        triggerNotification(`تنبيه طارئ: ${n.message}`, 'emergency');
         if (audioReady) playSimpleSound('/audio/emergency.mp3');
-        setTimeout(() => setActiveNotification(null), 15000);
       } else if (n.type === 'name_call') {
-        setActiveNotification({ msg: `الرجاء من المريض: ${n.message} التوجه للعيادة`, type: 'normal' });
+        triggerNotification(`الرجاء من المريض: ${n.message} التوجه للعيادة`, 'normal');
         if (audioReady) playSimpleSound('/audio/ding.mp3');
-        setTimeout(() => setActiveNotification(null), 12000);
       } else if (n.type === 'transfer') {
-        setActiveNotification({ msg: n.message, type: 'transfer' });
+        triggerNotification(n.message, 'transfer');
         if (audioReady) playSimpleSound('/audio/ding.mp3');
-        setTimeout(() => setActiveNotification(null), 10000);
       }
     });
 
@@ -88,6 +81,12 @@ const DisplayScreen: React.FC = () => {
     if (d) setDoctors(d);
   };
 
+  const triggerNotification = (msg: string, type: string) => {
+    setActiveNotification({ msg, type });
+    if (audioReady) playSimpleSound('/audio/ding.mp3');
+    setTimeout(() => setActiveNotification(null), 8000);
+  };
+
   const handleStartDisplay = () => {
     const screen = screens.find(s => s.id === selectedScreenId);
     if (screen && screen.password === password) {
@@ -101,15 +100,13 @@ const DisplayScreen: React.FC = () => {
 
   const getNotificationStyles = (type: string) => {
     switch (type) {
-      case 'emergency': return 'border-red-600 bg-red-50 text-red-900 notification-red';
-      case 'transfer': return 'border-blue-600 bg-blue-50 text-blue-900 notification-blue';
-      default: return 'border-green-600 bg-green-50 text-green-900 notification-green';
+      case 'emergency': return 'border-red-600 text-red-900 notification-red';
+      case 'transfer': return 'border-blue-600 text-blue-900 notification-blue';
+      default: return 'border-green-600 text-green-900 notification-green';
     }
   };
 
   const currentDoctor = doctors[currentDoctorIdx];
-
-  // فلترة العيادات لتظهر فقط المرتبطة بهذه الشاشة
   const filteredClinics = clinics.filter(c => 
     !c.linked_screens || c.linked_screens.length === 0 || c.linked_screens.includes(selectedScreenId)
   );
@@ -147,10 +144,27 @@ const DisplayScreen: React.FC = () => {
         </div>
       </header>
 
-      <main className="flex-1 flex overflow-hidden">
+      <main className="flex-1 flex overflow-hidden relative">
+        {/* إشعار الجرس (نمط فيسبوك) */}
+        {activeNotification && (
+          <div className="absolute top-6 left-10 z-[100] animate-shake">
+            <div className={`flex items-center gap-5 p-6 rounded-[2.5rem] shadow-2xl border-4 bg-white ${getNotificationStyles(activeNotification.type)}`}>
+               <div className="relative">
+                  <div className="bg-slate-100 p-5 rounded-3xl">
+                    <Bell size={44} className="animate-bounce text-slate-700" />
+                  </div>
+                  <span className="absolute -top-1 -right-1 bg-red-600 w-6 h-6 rounded-full border-4 border-white flex items-center justify-center animate-ping"></span>
+               </div>
+               <div className="max-w-md">
+                  <h2 className="text-3xl font-black leading-tight text-slate-800">{activeNotification.msg}</h2>
+               </div>
+            </div>
+          </div>
+        )}
+
         {/* قسم العيادات */}
         <div 
-          className={`p-4 bg-slate-200 overflow-hidden flex flex-col gap-4 border-l-4 border-slate-300 transition-all duration-500`} 
+          className="p-4 bg-slate-200 overflow-hidden flex flex-col gap-4 border-l-4 border-slate-300 transition-all duration-500" 
           style={{ width: `${config.layoutSplitPercent}%` }}
         >
           <div className="flex-1 overflow-y-auto grid gap-4 auto-rows-min scrollbar-hide" style={{ gridTemplateColumns: `repeat(${config.columns}, minmax(0, 1fr))` }}>
@@ -165,52 +179,17 @@ const DisplayScreen: React.FC = () => {
               </div>
             ))}
           </div>
-          
-          <div className="grid grid-cols-2 gap-4">
-            {currentDoctor && (
-              <div className="bg-white rounded-[2.5rem] border-r-[10px] border-blue-600 shadow-lg p-4 flex items-center gap-4 h-36">
-                <div className="w-16 h-16 bg-slate-50 rounded-2xl overflow-hidden flex items-center justify-center shrink-0 border">
-                   {currentDoctor.image_url ? <img src={currentDoctor.image_url} className="w-full h-full object-cover" /> : <User size={30} className="text-slate-300" />}
-                </div>
-                <div className="overflow-hidden">
-                  <h4 className="text-lg font-black text-slate-800 truncate">{currentDoctor.name}</h4>
-                  <p className="text-xs font-bold text-slate-400">{currentDoctor.specialty}</p>
-                </div>
-              </div>
-            )}
-            <div className="bg-white rounded-[2.5rem] border-r-[10px] border-amber-500 shadow-lg p-4 flex items-center gap-4 h-36">
-              <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center shrink-0 border">
-                 <QrCode size={32} />
-              </div>
-              <div className="overflow-hidden">
-                <h4 className="text-lg font-black text-slate-800">تابع دورك</h4>
-                <p className="text-[10px] font-bold text-slate-400">امسح الكود للمتابعة من هاتفك</p>
-              </div>
-            </div>
-          </div>
         </div>
 
-        {/* قسم الفيديو والإشعارات */}
+        {/* قسم الفيديو */}
         {config.showVideo && (
           <div className="flex-1 bg-black flex items-center justify-center relative transition-all duration-500">
             <video className="w-full h-full object-cover opacity-60" autoPlay muted loop src="/videos/display.mp4" />
-            
-            {activeNotification && (
-              <div className="absolute top-10 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-50">
-                <div className={`border-4 rounded-[3rem] p-10 shadow-2xl text-center relative overflow-hidden ${getNotificationStyles(activeNotification.type)}`}>
-                  <div className="flex items-center justify-center gap-6">
-                    <Bell size={48} className="animate-bounce shrink-0" />
-                    <h2 className="text-4xl font-black leading-tight">{activeNotification.msg}</h2>
-                  </div>
-                </div>
-              </div>
-            )}
           </div>
         )}
       </main>
 
       <footer className="h-20 bg-blue-900 text-white overflow-hidden flex items-center relative z-20 border-t-4" style={{ backgroundColor: config.themeColor }}>
-        <div className="absolute left-0 h-full bg-white/20 px-6 flex items-center font-black z-10 backdrop-blur-md">أخبار العيادة</div>
         <div className="animate-marquee px-4 text-3xl font-black" style={{ '--speed': `${settings?.ticker_speed || 20}s` } as any}>
           {settings?.ticker_content}
         </div>
@@ -224,54 +203,46 @@ const DisplayScreen: React.FC = () => {
                <button onClick={() => setShowConfig(false)} className="p-3 bg-slate-100 rounded-full transition-all hover:bg-slate-200"><X size={24}/></button>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-               {/* التحكم في مقاسات الكروت */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 text-right">
                <div className="space-y-6">
                   <h4 className="font-black text-blue-600 border-b pb-2 flex items-center gap-2"><Layout size={20}/> أبعاد الكروت والخط</h4>
                   
                   <div className="space-y-4">
                     <div>
-                      <div className="flex justify-between text-xs font-bold mb-2"><span>عرض الكارت</span> <span>{config.cardWidthPercent}%</span></div>
-                      <input type="range" min="50" max="100" className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600" value={config.cardWidthPercent} onChange={e => setConfig({...config, cardWidthPercent: parseInt(e.target.value)})} />
+                      <div className="flex justify-between text-xs font-bold mb-2"><span>عرض الكارت (%)</span> <span>{config.cardWidthPercent}%</span></div>
+                      <input type="range" min="50" max="100" className="w-full" value={config.cardWidthPercent} onChange={e => setConfig({...config, cardWidthPercent: parseInt(e.target.value)})} />
                     </div>
-
                     <div>
-                      <div className="flex justify-between text-xs font-bold mb-2"><span>طول الكارت</span> <span>{config.cardHeightPx}px</span></div>
-                      <input type="range" min="100" max="400" className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600" value={config.cardHeightPx} onChange={e => setConfig({...config, cardHeightPx: parseInt(e.target.value)})} />
+                      <div className="flex justify-between text-xs font-bold mb-2"><span>طول الكارت (px)</span> <span>{config.cardHeightPx}px</span></div>
+                      <input type="range" min="100" max="500" className="w-full" value={config.cardHeightPx} onChange={e => setConfig({...config, cardHeightPx: parseInt(e.target.value)})} />
                     </div>
-
                     <div>
-                      <div className="flex justify-between text-xs font-bold mb-2"><span>حجم الخط</span> <span>{config.fontSizeRem}rem</span></div>
-                      <input type="range" min="1" max="10" step="0.1" className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600" value={config.fontSizeRem} onChange={e => setConfig({...config, fontSizeRem: parseFloat(e.target.value)})} />
+                      <div className="flex justify-between text-xs font-bold mb-2"><span>حجم الخط (rem)</span> <span>{config.fontSizeRem}rem</span></div>
+                      <input type="range" min="1" max="10" step="0.1" className="w-full" value={config.fontSizeRem} onChange={e => setConfig({...config, fontSizeRem: parseFloat(e.target.value)})} />
                     </div>
-
                     <div>
                       <div className="flex justify-between text-xs font-bold mb-2"><span>عدد الأعمدة</span> <span>{config.columns}</span></div>
-                      <input type="range" min="1" max="6" step="1" className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600" value={config.columns} onChange={e => setConfig({...config, columns: parseInt(e.target.value)})} />
+                      <input type="range" min="1" max="6" step="1" className="w-full" value={config.columns} onChange={e => setConfig({...config, columns: parseInt(e.target.value)})} />
                     </div>
                   </div>
                </div>
 
-               {/* التحكم في تخطيط الشاشة */}
                <div className="space-y-6">
                   <h4 className="font-black text-blue-600 border-b pb-2 flex items-center gap-2"><Tv size={20}/> تخطيط الشاشة والفيديو</h4>
                   
                   <div className="space-y-6">
                     <div>
-                      <div className="flex justify-between text-xs font-bold mb-2"><span>مساحة العيادات</span> <span>{config.layoutSplitPercent}%</span></div>
-                      <input type="range" min="25" max="100" className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600" value={config.layoutSplitPercent} onChange={e => setConfig({...config, layoutSplitPercent: parseInt(e.target.value)})} />
+                      <div className="flex justify-between text-xs font-bold mb-2"><span>مساحة العيادات (%)</span> <span>{config.layoutSplitPercent}%</span></div>
+                      <input type="range" min="25" max="100" className="w-full" value={config.layoutSplitPercent} onChange={e => setConfig({...config, layoutSplitPercent: parseInt(e.target.value)})} />
                     </div>
 
                     <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border">
-                      <div className="flex items-center gap-3">
-                        {config.showVideo ? <Video className="text-emerald-500"/> : <VideoOff className="text-slate-400"/>}
-                        <span className="font-bold text-sm">عرض الفيديو الخلفي</span>
-                      </div>
+                      <span className="font-bold text-sm">عرض الفيديو الخلفي</span>
                       <button 
                         onClick={() => setConfig({...config, showVideo: !config.showVideo})}
-                        className={`w-12 h-6 rounded-full p-1 transition-all duration-300 ${config.showVideo ? 'bg-emerald-500' : 'bg-slate-300'}`}
+                        className={`w-12 h-6 rounded-full p-1 transition-all ${config.showVideo ? 'bg-emerald-500' : 'bg-slate-300'}`}
                       >
-                        <div className={`bg-white w-4 h-4 rounded-full shadow-sm transition-all duration-300 ${config.showVideo ? 'mr-6' : 'mr-0'}`} />
+                        <div className={`bg-white w-4 h-4 rounded-full shadow-sm transition-all ${config.showVideo ? 'mr-6' : 'mr-0'}`} />
                       </button>
                     </div>
 

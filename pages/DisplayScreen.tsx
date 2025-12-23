@@ -166,25 +166,30 @@ const DisplayScreen: React.FC = () => {
             ))}
           </div>
           
-          <div className="grid grid-cols-2 gap-4">
-            {currentDoctor && (
+          {/* تقسيم الطبيب والباركود: الطبيب مساحة أكبر */}
+          <div className="grid grid-cols-[2fr_1fr] gap-4">
+            {currentDoctor ? (
               <div className="bg-white rounded-[2.5rem] border-r-[10px] border-blue-600 shadow-lg p-4 flex items-center gap-4 h-36">
-                <div className="w-16 h-16 bg-slate-50 rounded-2xl overflow-hidden flex items-center justify-center shrink-0 border">
-                   {currentDoctor.image_url ? <img src={currentDoctor.image_url} className="w-full h-full object-cover" /> : <User size={30} className="text-slate-300" />}
+                <div className="w-20 h-20 bg-slate-50 rounded-2xl overflow-hidden flex items-center justify-center shrink-0 border">
+                   {currentDoctor.image_url ? <img src={currentDoctor.image_url} className="w-full h-full object-cover" /> : <User size={40} className="text-slate-300" />}
                 </div>
-                <div className="overflow-hidden">
-                  <h4 className="text-lg font-black text-slate-800 truncate">{currentDoctor.name}</h4>
-                  <p className="text-xs font-bold text-slate-400">{currentDoctor.specialty}</p>
+                <div className="overflow-hidden flex-1">
+                  <h4 className="text-2xl font-black text-slate-800 truncate">{currentDoctor.name}</h4>
+                  <p className="text-sm font-bold text-slate-400">{currentDoctor.specialty}</p>
                 </div>
               </div>
+            ) : (
+                <div className="bg-white rounded-[2.5rem] border-r-[10px] border-slate-300 shadow-lg p-4 flex items-center justify-center h-36">
+                    <p className="text-slate-400 font-bold">لا يوجد أطباء متاحين</p>
+                </div>
             )}
-            <div className="bg-white rounded-[2.5rem] border-r-[10px] border-amber-500 shadow-lg p-4 flex items-center gap-4 h-36">
-              <div className="w-16 h-16 bg-amber-50 text-amber-500 rounded-2xl flex items-center justify-center shrink-0 border">
-                 <QrCode size={32} />
+            <div className="bg-white rounded-[2.5rem] border-r-[10px] border-amber-500 shadow-lg p-4 flex flex-col items-center justify-center gap-2 h-36 text-center">
+              <div className="w-12 h-12 bg-amber-50 text-amber-500 rounded-xl flex items-center justify-center shrink-0 border">
+                 <QrCode size={24} />
               </div>
               <div className="overflow-hidden">
-                <h4 className="text-lg font-black text-slate-800">تابع دورك</h4>
-                <p className="text-[10px] font-bold text-slate-400">امسح الكود للمتابعة من هاتفك</p>
+                <h4 className="text-sm font-black text-slate-800">تابع دورك</h4>
+                <p className="text-[9px] font-bold text-slate-400">امسح الكود</p>
               </div>
             </div>
           </div>
@@ -197,9 +202,9 @@ const DisplayScreen: React.FC = () => {
             
             {activeNotification && (
               <div className="absolute top-10 left-1/2 -translate-x-1/2 w-full max-w-2xl px-6 z-50">
-                <div className={`border-4 rounded-[3rem] p-10 shadow-2xl text-center relative overflow-hidden ${getNotificationStyles(activeNotification.type)}`}>
-                  <div className="flex items-center justify-center gap-6">
-                    <Bell size={48} className="animate-bounce shrink-0" />
+                <div className={`border-4 rounded-[3rem] p-10 shadow-2xl text-center relative overflow-hidden animate-shake ${getNotificationStyles(activeNotification.type)}`}>
+                   <div className="absolute top-4 right-4 animate-bounce"><Bell size={32}/></div>
+                   <div className="flex flex-col items-center justify-center gap-4">
                     <h2 className="text-4xl font-black leading-tight">{activeNotification.msg}</h2>
                   </div>
                 </div>
@@ -218,7 +223,7 @@ const DisplayScreen: React.FC = () => {
 
       {showConfig && (
         <div className="fixed inset-0 bg-black/90 backdrop-blur-md z-[100] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[3rem] p-8 max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl">
+          <div className="bg-white rounded-[3rem] p-8 max-w-4xl w-full max-h-[95vh] overflow-y-auto shadow-2xl font-cairo">
             <div className="flex justify-between items-center mb-6 border-b pb-4">
                <h3 className="text-3xl font-black">إعدادات العرض المتقدمة</h3>
                <button onClick={() => setShowConfig(false)} className="p-3 bg-slate-100 rounded-full transition-all hover:bg-slate-200"><X size={24}/></button>
@@ -231,23 +236,43 @@ const DisplayScreen: React.FC = () => {
                   
                   <div className="space-y-4">
                     <div>
-                      <div className="flex justify-between text-xs font-bold mb-2"><span>عرض الكارت</span> <span>{config.cardWidthPercent}%</span></div>
-                      <input type="range" min="50" max="100" className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600" value={config.cardWidthPercent} onChange={e => setConfig({...config, cardWidthPercent: parseInt(e.target.value)})} />
+                      <div className="flex justify-between text-xs font-bold mb-2"><span>عرض الكارت (نسبة مئوية)</span> <span className="bg-slate-100 px-2 rounded">{config.cardWidthPercent}%</span></div>
+                      <input 
+                        type="range" min="50" max="100" 
+                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                        value={config.cardWidthPercent} 
+                        onChange={e => setConfig({...config, cardWidthPercent: parseInt(e.target.value)})} 
+                      />
                     </div>
 
                     <div>
-                      <div className="flex justify-between text-xs font-bold mb-2"><span>طول الكارت</span> <span>{config.cardHeightPx}px</span></div>
-                      <input type="range" min="100" max="400" className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600" value={config.cardHeightPx} onChange={e => setConfig({...config, cardHeightPx: parseInt(e.target.value)})} />
+                      <div className="flex justify-between text-xs font-bold mb-2"><span>طول الكارت (بكسل)</span> <span className="bg-slate-100 px-2 rounded">{config.cardHeightPx}px</span></div>
+                      <input 
+                        type="range" min="100" max="400" 
+                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                        value={config.cardHeightPx} 
+                        onChange={e => setConfig({...config, cardHeightPx: parseInt(e.target.value)})} 
+                      />
                     </div>
 
                     <div>
-                      <div className="flex justify-between text-xs font-bold mb-2"><span>حجم الخط</span> <span>{config.fontSizeRem}rem</span></div>
-                      <input type="range" min="1" max="10" step="0.1" className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600" value={config.fontSizeRem} onChange={e => setConfig({...config, fontSizeRem: parseFloat(e.target.value)})} />
+                      <div className="flex justify-between text-xs font-bold mb-2"><span>حجم الخط</span> <span className="bg-slate-100 px-2 rounded">{config.fontSizeRem}rem</span></div>
+                      <input 
+                        type="range" min="1.5" max="8" step="0.1" 
+                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                        value={config.fontSizeRem} 
+                        onChange={e => setConfig({...config, fontSizeRem: parseFloat(e.target.value)})} 
+                      />
                     </div>
 
                     <div>
-                      <div className="flex justify-between text-xs font-bold mb-2"><span>عدد الأعمدة</span> <span>{config.columns}</span></div>
-                      <input type="range" min="1" max="6" step="1" className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600" value={config.columns} onChange={e => setConfig({...config, columns: parseInt(e.target.value)})} />
+                      <div className="flex justify-between text-xs font-bold mb-2"><span>عدد الأعمدة</span> <span className="bg-slate-100 px-2 rounded">{config.columns}</span></div>
+                      <input 
+                        type="range" min="1" max="6" step="1" 
+                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                        value={config.columns} 
+                        onChange={e => setConfig({...config, columns: parseInt(e.target.value)})} 
+                      />
                     </div>
                   </div>
                </div>
@@ -258,8 +283,14 @@ const DisplayScreen: React.FC = () => {
                   
                   <div className="space-y-6">
                     <div>
-                      <div className="flex justify-between text-xs font-bold mb-2"><span>مساحة العيادات</span> <span>{config.layoutSplitPercent}%</span></div>
-                      <input type="range" min="25" max="100" className="w-full h-2 bg-slate-100 rounded-lg appearance-none cursor-pointer accent-blue-600" value={config.layoutSplitPercent} onChange={e => setConfig({...config, layoutSplitPercent: parseInt(e.target.value)})} />
+                      <div className="flex justify-between text-xs font-bold mb-2"><span>مساحة الكروت vs الفيديو</span> <span className="bg-slate-100 px-2 rounded">{config.layoutSplitPercent}%</span></div>
+                      <input 
+                        type="range" min="20" max="80" 
+                        className="w-full h-2 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600" 
+                        value={config.layoutSplitPercent} 
+                        onChange={e => setConfig({...config, layoutSplitPercent: parseInt(e.target.value)})} 
+                      />
+                      <p className="text-[10px] text-slate-400 mt-1">اسحب لليمين لزيادة مساحة الكروت على حساب الفيديو</p>
                     </div>
 
                     <div className="flex items-center justify-between p-4 bg-slate-50 rounded-2xl border">
@@ -289,7 +320,7 @@ const DisplayScreen: React.FC = () => {
                </div>
             </div>
 
-            <button onClick={() => setShowConfig(false)} className="w-full mt-10 bg-slate-900 text-white py-5 rounded-3xl font-black text-xl shadow-xl transition-all hover:bg-slate-800">حفظ الإعدادات</button>
+            <button onClick={() => setShowConfig(false)} className="w-full mt-10 bg-slate-900 text-white py-5 rounded-3xl font-black text-xl shadow-xl transition-all hover:bg-slate-800">حفظ الإعدادات وإغلاق</button>
           </div>
         </div>
       )}

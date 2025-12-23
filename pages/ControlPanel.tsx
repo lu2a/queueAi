@@ -110,7 +110,7 @@ const ControlPanel: React.FC = () => {
       to_admin: false
     });
     if(!error) { alert(`تم تحويل العميل ${num}`); setManualTransferNum(''); }
-    else alert("خطأ في التحويل");
+    else alert("خطأ في التحويل: يرجى تحديث قاعدة البيانات");
   };
 
   const sendEmergency = async (msg: string) => {
@@ -124,10 +124,13 @@ const ControlPanel: React.FC = () => {
     playSimpleSound('/audio/emergency.mp3');
   };
 
+  // وظيفة لتحديث حالة العيادة بشكل صحيح
   const handleStatusChange = async (newStatus: 'active' | 'paused') => {
     if (!selectedClinic) return;
     const { error } = await supabase.from('clinics').update({ status: newStatus }).eq('id', selectedClinic.id);
-    if (error) alert("فشل تحديث الحالة");
+    if (error) {
+      alert("خطأ في تحديث الحالة");
+    }
   };
 
   if (!isLoggedIn) {

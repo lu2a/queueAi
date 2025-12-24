@@ -1,8 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Maximize, Settings as SettingsIcon, Bell, Clock, X, Volume2, User, Stethoscope, Sliders, Layout, Tv, QrCode, Video, VideoOff } from 'lucide-react';
 import { toHindiDigits, playCallSequence, playSimpleSound } from '../utils';
-import { Clinic, SystemSettings, Notification, Doctor, Screen } from '../types';
+import { Clinic, SystemSettings, Notification, Doctor, Screen, DisplayConfig } from '../types';
 import { supabase, subscribeToChanges } from '../supabase';
 
 const DisplayScreen: React.FC = () => {
@@ -21,6 +21,7 @@ const DisplayScreen: React.FC = () => {
   
   // حالة فهرس الفيديو الحالي
   const [currentVideoIndex, setCurrentVideoIndex] = useState(1);
+  const videoRef = useRef<HTMLVideoElement>(null);
 
   const [config, setConfig] = useState({
     cardWidthPercent: 100,
@@ -31,7 +32,8 @@ const DisplayScreen: React.FC = () => {
     showVideo: true,
     themeColor: '#2563eb',
     cardBg: '#ffffff',
-    cardTextColor: '#1e3a8a'
+    cardTextColor: '#1e3a8a',
+    videoStatus: 'play' // play, pause, stop
   });
 
   useEffect(() => {
@@ -55,6 +57,30 @@ const DisplayScreen: React.FC = () => {
       } else { fetchInitialData(); }
     });
 
+    // الاشتراك في تحديثات إعدادات الشاشة
+    const displaySub = subscribeToChanges('display_config', (payload) => {
+      if (payload.new) {
+         const newConfig = payload.new as DisplayConfig;
+         setConfig(prev => ({
+            ...prev,
+            cardHeightPx: newConfig.card_height,
+            cardWidthPercent: newConfig.card_width,
+            fontSizeRem: newConfig.font_size,
+            columns: newConfig.columns_count,
+            layoutSplitPercent: newConfig.cards_percent,
+            showVideo: newConfig.video_status !== 'stop',
+            videoStatus: newConfig.video_status
+         }));
+
+         // معالجة أوامر الفيديو
+         if (newConfig.video_trigger && newConfig.video_trigger.startsWith('next')) {
+            setCurrentVideoIndex(prev => prev >= 50 ? 1 : prev + 1);
+         } else if (newConfig.video_trigger && newConfig.video_trigger.startsWith('prev')) {
+            setCurrentVideoIndex(prev => prev <= 1 ? 50 : prev - 1);
+         }
+      }
+    });
+
     const notifSub = subscribeToChanges('notifications', (payload) => {
       const n = payload.new as Notification;
       if (n.type === 'emergency') {
@@ -76,9 +102,21 @@ const DisplayScreen: React.FC = () => {
       clearInterval(timer);
       clearInterval(docTimer);
       supabase.removeChannel(clinicSub);
+      supabase.removeChannel(displaySub);
       notifSub.unsubscribe();
     };
   }, [audioReady, doctors.length]);
+
+  // التحكم الفعلي في الفيديو بناء على الحالة
+  useEffect(() => {
+    if (videoRef.current) {
+      if (config.videoStatus === 'play') {
+        videoRef.current.play().catch(e => console.log('Autoplay blocked', e));
+      } else if (config.videoStatus === 'pause') {
+        videoRef.current.pause();
+      }
+    }
+  }, [config.videoStatus, currentVideoIndex]);
 
   const fetchInitialData = async () => {
     const { data: scr } = await supabase.from('screens').select('*').order('number');
@@ -89,6 +127,21 @@ const DisplayScreen: React.FC = () => {
     if (c) setClinics(c);
     const { data: d } = await supabase.from('doctors').select('*').order('name');
     if (d) setDoctors(d);
+    
+    // جلب الإعدادات الأولية
+    const { data: dc } = await supabase.from('display_config').select('*').single();
+    if (dc) {
+       setConfig(prev => ({
+          ...prev,
+          cardHeightPx: dc.card_height,
+          cardWidthPercent: dc.card_width,
+          fontSizeRem: dc.font_size,
+          columns: dc.columns_count,
+          layoutSplitPercent: dc.cards_percent,
+          showVideo: dc.video_status !== 'stop',
+          videoStatus: dc.video_status
+       }));
+    }
   };
 
   const handleStartDisplay = () => {
@@ -202,6 +255,7 @@ const DisplayScreen: React.FC = () => {
         {config.showVideo && (
           <div className="flex-1 bg-black flex items-center justify-center relative transition-all duration-500">
             <video 
+              ref={videoRef}
               className="w-full h-full object-cover opacity-60" 
               autoPlay 
               muted 

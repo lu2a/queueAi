@@ -53,3 +53,14 @@ export interface Notification {
   created_at: string;
   patient_number?: number;
 }
+
+export interface DisplayConfig {
+  id: string;
+  card_height: number;
+  card_width: number;
+  font_size: number;
+  columns_count: number;
+  cards_percent: number;
+  video_status: 'play' | 'pause' | 'stop';
+  video_trigger?: string;
+}

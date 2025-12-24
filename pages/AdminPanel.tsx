@@ -4,19 +4,22 @@ import {
   Settings, Users, Tv, Stethoscope, Trash2, Edit, Plus, RefreshCw, Send, 
   Volume2, AlertCircle, Play, Pause, Repeat, Hash, Mic, ShieldAlert, X,
   Activity, Zap, Flame, Droplets, Calendar, Clock, ArrowLeftRight, Check,
-  Bell, MessageSquare, Wind, Music, Square, Printer, Save
+  Bell, MessageSquare, Wind, Music, Square, Printer, Save, MonitorPlay, SkipForward, SkipBack, StopCircle, LayoutTemplate
 } from 'lucide-react';
 import { toHindiDigits, playSimpleSound, playCallSequence } from '../utils';
 import { supabase, subscribeToChanges } from '../supabase';
-import { Clinic, Doctor, Screen, SystemSettings, Notification } from '../types';
+import { Clinic, Doctor, Screen, SystemSettings, Notification, DisplayConfig } from '../types';
 
 const AdminPanel: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<'settings' | 'clinics' | 'doctors' | 'screens' | 'remote' | 'print'>('settings');
+  const [activeTab, setActiveTab] = useState<'settings' | 'clinics' | 'doctors' | 'screens' | 'remote' | 'print' | 'display_control'>('settings');
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
   const [screens, setScreens] = useState<Screen[]>([]);
   const [settings, setSettings] = useState<SystemSettings | null>(null);
   const [adminNotifications, setAdminNotifications] = useState<Notification[]>([]);
+  
+  // التحكم في الشاشة Live
+  const [displayConfig, setDisplayConfig] = useState<DisplayConfig | null>(null);
   
   // التنبيهات
   const [activeNotif, setActiveNotif] = useState<Notification | null>(null);
@@ -60,6 +63,10 @@ const AdminPanel: React.FC = () => {
       }
     });
 
+    const displaySub = subscribeToChanges('display_config', (payload) => {
+      if (payload.new) setDisplayConfig(payload.new as DisplayConfig);
+    });
+
     // تحديث بيانات العيادة المختارة للتحكم الموحد بشكل لحظي
     const clinicSub = subscribeToChanges('clinics', (payload) => {
       setClinics(prev => prev.map(c => c.id === payload.new.id ? { ...c, ...payload.new } : c));
@@ -68,6 +75,7 @@ const AdminPanel: React.FC = () => {
     return () => { 
         supabase.removeChannel(sub); 
         supabase.removeChannel(clinicSub);
+        supabase.removeChannel(displaySub);
         clearInterval(timer); 
     };
   }, [activeTab]);
@@ -83,6 +91,15 @@ const AdminPanel: React.FC = () => {
     if (set) setSettings(set);
     const { data: notifs } = await supabase.from('notifications').select('*').eq('to_admin', true).order('created_at', { ascending: false }).limit(20);
     if (notifs) setAdminNotifications(notifs);
+    const { data: dc } = await supabase.from('display_config').select('*').single();
+    if (dc) setDisplayConfig(dc);
+  };
+
+  const updateDisplayConfig = async (updates: Partial<DisplayConfig>) => {
+    if(!displayConfig) return;
+    const { error } = await supabase.from('display_config').update(updates).eq('id', displayConfig.id);
+    if(error) alert('فشل التحديث');
+    else setDisplayConfig({ ...displayConfig, ...updates });
   };
 
   const deleteItem = async (table: string, id: string) => {
@@ -270,6 +287,7 @@ const AdminPanel: React.FC = () => {
             { id: 'doctors', label: 'إدارة الأطباء', icon: Stethoscope },
             { id: 'screens', label: 'إدارة الشاشات', icon: Tv },
             { id: 'remote', label: 'التحكم الموحد', icon: Mic },
+            { id: 'display_control', label: 'تحكم الشاشة Live', icon: MonitorPlay },
             { id: 'print', label: 'طباعة التذاكر', icon: Printer }
           ].map(tab => (
             <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`w-full flex items-center gap-4 p-4 rounded-xl transition-all ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-slate-800'}`}><tab.icon size={20} /> <span className="font-bold">{tab.label}</span></button>
@@ -281,7 +299,7 @@ const AdminPanel: React.FC = () => {
         {/* Top Bar with Bell */}
         <div className="flex justify-between items-center mb-8 print:hidden">
             <h2 className="text-2xl font-black text-slate-800">
-               {activeTab === 'remote' ? 'التحكم الحي الموحد' : 'إدارة النظام'}
+               {activeTab === 'remote' ? 'التحكم الحي الموحد' : (activeTab === 'display_control' ? 'التحكم في الشاشة' : 'إدارة النظام')}
             </h2>
             <button 
               onClick={() => setShowLogs(!showLogs)} 
@@ -361,6 +379,76 @@ const AdminPanel: React.FC = () => {
                ))}
              </div>
            </div>
+        )}
+
+        {activeTab === 'display_control' && displayConfig && (
+          <div className="space-y-8 animate-fadeIn pb-10">
+             {/* التحكم في الفيديو */}
+             <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200">
+                <h3 className="text-xl font-black flex items-center gap-2 mb-6 text-slate-800"><MonitorPlay className="text-blue-600"/> التحكم في الفيديو</h3>
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                   <div className="flex gap-2 bg-slate-100 p-2 rounded-2xl justify-center">
+                      <button onClick={() => updateDisplayConfig({ video_status: 'play' })} className={`flex-1 py-3 rounded-xl font-black flex items-center justify-center gap-2 ${displayConfig.video_status === 'play' ? 'bg-emerald-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-200'}`}><Play size={20}/> تشغيل</button>
+                      <button onClick={() => updateDisplayConfig({ video_status: 'pause' })} className={`flex-1 py-3 rounded-xl font-black flex items-center justify-center gap-2 ${displayConfig.video_status === 'pause' ? 'bg-amber-500 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-200'}`}><Pause size={20}/> إيقاف مؤقت</button>
+                      <button onClick={() => updateDisplayConfig({ video_status: 'stop' })} className={`flex-1 py-3 rounded-xl font-black flex items-center justify-center gap-2 ${displayConfig.video_status === 'stop' ? 'bg-red-600 text-white shadow-lg' : 'text-slate-500 hover:bg-slate-200'}`}><StopCircle size={20}/> إيقاف</button>
+                   </div>
+                   <div className="flex gap-2">
+                      <button onClick={() => updateDisplayConfig({ video_trigger: 'prev-' + Date.now() })} className="flex-1 py-4 bg-slate-800 text-white rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-slate-900"><SkipBack/> السابق</button>
+                      <button onClick={() => updateDisplayConfig({ video_trigger: 'next-' + Date.now() })} className="flex-1 py-4 bg-slate-800 text-white rounded-2xl font-black flex items-center justify-center gap-2 hover:bg-slate-900">التالي <SkipForward/></button>
+                   </div>
+                   <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex items-center justify-center text-center">
+                      <p className="text-blue-800 font-bold text-sm">الحالة الحالية: <span className="font-black text-lg">{displayConfig.video_status === 'play' ? 'تشغيل' : displayConfig.video_status === 'pause' ? 'مؤقت' : 'متوقف'}</span></p>
+                   </div>
+                </div>
+             </div>
+
+             {/* التحكم في التصميم */}
+             <div className="bg-white p-8 rounded-[2rem] shadow-sm border border-slate-200">
+                <h3 className="text-xl font-black flex items-center gap-2 mb-6 text-slate-800"><LayoutTemplate className="text-purple-600"/> إعدادات التصميم (Realtime)</h3>
+                
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                   <div className="space-y-4">
+                      <label className="text-sm font-bold block">نسبة مساحة الكروت (Cards Percent)</label>
+                      <div className="flex items-center gap-4">
+                        <input type="range" min="20" max="80" className="flex-1 h-3 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600" value={displayConfig.cards_percent} onChange={e => updateDisplayConfig({ cards_percent: parseInt(e.target.value) })} />
+                        <span className="w-16 text-center font-black bg-slate-100 p-2 rounded-lg">{displayConfig.cards_percent}%</span>
+                      </div>
+                   </div>
+
+                   <div className="space-y-4">
+                      <label className="text-sm font-bold block">عدد الأعمدة (Columns Count)</label>
+                      <div className="flex items-center gap-4">
+                        <input type="range" min="1" max="6" className="flex-1 h-3 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600" value={displayConfig.columns_count} onChange={e => updateDisplayConfig({ columns_count: parseInt(e.target.value) })} />
+                        <span className="w-16 text-center font-black bg-slate-100 p-2 rounded-lg">{displayConfig.columns_count}</span>
+                      </div>
+                   </div>
+
+                   <div className="space-y-4">
+                      <label className="text-sm font-bold block">ارتفاع الكارت (Card Height)</label>
+                      <div className="flex items-center gap-4">
+                        <input type="range" min="100" max="400" className="flex-1 h-3 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600" value={displayConfig.card_height} onChange={e => updateDisplayConfig({ card_height: parseInt(e.target.value) })} />
+                        <span className="w-16 text-center font-black bg-slate-100 p-2 rounded-lg">{displayConfig.card_height}px</span>
+                      </div>
+                   </div>
+
+                   <div className="space-y-4">
+                      <label className="text-sm font-bold block">عرض الكارت (Card Width %)</label>
+                      <div className="flex items-center gap-4">
+                        <input type="range" min="50" max="100" className="flex-1 h-3 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600" value={displayConfig.card_width} onChange={e => updateDisplayConfig({ card_width: parseInt(e.target.value) })} />
+                        <span className="w-16 text-center font-black bg-slate-100 p-2 rounded-lg">{displayConfig.card_width}%</span>
+                      </div>
+                   </div>
+
+                   <div className="space-y-4">
+                      <label className="text-sm font-bold block">حجم الخط (Font Size)</label>
+                      <div className="flex items-center gap-4">
+                        <input type="range" min="1.5" max="8" step="0.1" className="flex-1 h-3 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-purple-600" value={displayConfig.font_size} onChange={e => updateDisplayConfig({ font_size: parseFloat(e.target.value) })} />
+                        <span className="w-16 text-center font-black bg-slate-100 p-2 rounded-lg">{displayConfig.font_size}</span>
+                      </div>
+                   </div>
+                </div>
+             </div>
+          </div>
         )}
 
         {activeTab === 'remote' && (

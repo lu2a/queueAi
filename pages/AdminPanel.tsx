@@ -4,13 +4,17 @@ import {
   Settings, Users, Tv, Stethoscope, Trash2, Edit, Plus, RefreshCw, Send, 
   Volume2, AlertCircle, Play, Pause, Repeat, Hash, Mic, ShieldAlert, X,
   Activity, Zap, Flame, Droplets, Calendar, Clock, ArrowLeftRight, Check,
-  Bell, MessageSquare, Wind, Music, Square, Printer, Save, MonitorPlay, SkipForward, SkipBack, StopCircle, LayoutTemplate
+  Bell, MessageSquare, Wind, Music, Square, Printer, Save, MonitorPlay, SkipForward, SkipBack, StopCircle, LayoutTemplate, Lock
 } from 'lucide-react';
 import { toHindiDigits, playSimpleSound, playCallSequence } from '../utils';
 import { supabase, subscribeToChanges } from '../supabase';
 import { Clinic, Doctor, Screen, SystemSettings, Notification, DisplayConfig } from '../types';
 
 const AdminPanel: React.FC = () => {
+  // Login State
+  const [isAuthenticated, setIsAuthenticated] = useState(false);
+  const [loginPassword, setLoginPassword] = useState('');
+
   const [activeTab, setActiveTab] = useState<'settings' | 'clinics' | 'doctors' | 'screens' | 'remote' | 'print' | 'display_control'>('settings');
   const [clinics, setClinics] = useState<Clinic[]>([]);
   const [doctors, setDoctors] = useState<Doctor[]>([]);
@@ -93,6 +97,18 @@ const AdminPanel: React.FC = () => {
     if (notifs) setAdminNotifications(notifs);
     const { data: dc } = await supabase.from('display_config').select('*').single();
     if (dc) setDisplayConfig(dc);
+  };
+
+  const handleLogin = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (settings && settings.admin_password && loginPassword === settings.admin_password) {
+      setIsAuthenticated(true);
+    } else if (settings && !settings.admin_password) {
+       // في حالة عدم وجود باسورد في القاعدة، نسمح بالدخول (أو يمكن رفضه حسب السياسة)
+       setIsAuthenticated(true);
+    } else {
+      alert('كلمة المرور غير صحيحة');
+    }
   };
 
   const updateDisplayConfig = async (updates: Partial<DisplayConfig>) => {
@@ -257,6 +273,40 @@ const AdminPanel: React.FC = () => {
 
   const selectedRemoteClinic = clinics.find(c => c.id === targetClinicId);
 
+  // واجهة تسجيل الدخول
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-slate-900 flex flex-col items-center justify-center p-6 font-cairo">
+         <div className="bg-white p-10 rounded-[3rem] shadow-2xl w-full max-w-md border-t-8 border-blue-600">
+           <div className="flex justify-center mb-8">
+             <div className="bg-blue-100 p-6 rounded-full">
+               <ShieldAlert size={64} className="text-blue-600" />
+             </div>
+           </div>
+           <h2 className="text-3xl font-black text-center mb-2 text-slate-800">لوحة الإدارة</h2>
+           <p className="text-center text-slate-400 font-bold mb-8">يرجى تسجيل الدخول للمتابعة</p>
+           
+           <form onSubmit={handleLogin} className="space-y-6">
+             <div className="relative">
+               <Lock className="absolute top-5 right-5 text-slate-400" size={20} />
+               <input 
+                 type="password" 
+                 placeholder="كلمة المرور" 
+                 className="w-full p-4 pr-12 border-2 rounded-2xl font-bold bg-slate-50 focus:border-blue-600 outline-none transition-all" 
+                 value={loginPassword} 
+                 onChange={(e) => setLoginPassword(e.target.value)} 
+               />
+             </div>
+             <button type="submit" className="w-full bg-blue-600 text-white py-5 rounded-2xl font-black shadow-lg text-lg hover:bg-blue-700 transition-all flex items-center justify-center gap-2">
+               تسجيل الدخول
+             </button>
+           </form>
+         </div>
+         <p className="mt-8 text-slate-500 font-bold text-sm">نظام إدارة الطوابير الذكي</p>
+      </div>
+    );
+  }
+
   return (
     <div className="flex-1 flex flex-col md:flex-row bg-slate-50 min-h-screen overflow-hidden print:bg-white font-cairo relative">
       {/* تنبيه الجرس المنبثق */}
@@ -293,6 +343,12 @@ const AdminPanel: React.FC = () => {
             <button key={tab.id} onClick={() => setActiveTab(tab.id as any)} className={`w-full flex items-center gap-4 p-4 rounded-xl transition-all ${activeTab === tab.id ? 'bg-blue-600 text-white shadow-lg' : 'hover:bg-slate-800'}`}><tab.icon size={20} /> <span className="font-bold">{tab.label}</span></button>
           ))}
         </nav>
+        
+        <div className="mt-10 pt-6 border-t border-slate-700">
+           <button onClick={() => setIsAuthenticated(false)} className="w-full flex items-center gap-4 p-4 rounded-xl text-red-400 hover:bg-slate-800 hover:text-red-300 transition-all font-bold">
+              <X size={20} /> تسجيل الخروج
+           </button>
+        </div>
       </aside>
 
       <main className="flex-1 p-8 overflow-y-auto print:p-0 flex flex-col">
@@ -319,6 +375,21 @@ const AdminPanel: React.FC = () => {
                  <div><label className="text-sm font-bold block mb-2">سرعة الشريط</label><input type="number" className="w-full p-4 border rounded-2xl font-bold" value={settings.ticker_speed} onChange={e => setSettings({...settings, ticker_speed: parseInt(e.target.value)})} /></div>
                </div>
                <div><label className="text-sm font-bold block mb-2">محتوى شريط الأخبار</label><textarea className="w-full p-4 border rounded-2xl h-32 font-bold" value={settings.ticker_content} onChange={e => setSettings({...settings, ticker_content: e.target.value})} /></div>
+               
+               <div className="pt-4 border-t">
+                  <h4 className="font-black text-red-500 mb-4 flex items-center gap-2"><Lock size={18}/> منطقة الأمان</h4>
+                  <div>
+                    <label className="text-sm font-bold block mb-2">كلمة مرور المدير (Admin Password)</label>
+                    <input 
+                      type="text" 
+                      placeholder="اتركه فارغاً إذا لم ترد تغييره"
+                      className="w-full p-4 border-2 border-red-100 bg-red-50 rounded-2xl font-bold text-red-900 focus:border-red-500 outline-none" 
+                      value={settings.admin_password || ''} 
+                      onChange={e => setSettings({...settings, admin_password: e.target.value})} 
+                    />
+                  </div>
+               </div>
+
                <button onClick={async () => { await supabase.from('settings').update(settings).eq('id', settings.id); alert('تم الحفظ'); }} className="bg-blue-600 text-white px-10 py-4 rounded-2xl font-black shadow-lg flex items-center gap-3"><Save /> حفظ الإعدادات</button>
             </div>
           </div>

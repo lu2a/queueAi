@@ -5,6 +5,7 @@ export interface SystemSettings {
   speech_speed: number;
   ticker_speed: number;
   ticker_content: string;
+  admin_password?: string;
 }
 
 export interface Doctor {

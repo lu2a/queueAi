@@ -4,7 +4,7 @@ import {
   Settings, Users, Tv, Stethoscope, Trash2, Edit, Plus, RefreshCw, Send, 
   Volume2, AlertCircle, Play, Pause, Repeat, Hash, Mic, ShieldAlert, X,
   Activity, Zap, Flame, Droplets, Calendar, Clock, ArrowLeftRight, Check,
-  Bell, MessageSquare, Wind, Music, Square, Printer, Save, MonitorPlay, SkipForward, SkipBack, StopCircle, LayoutTemplate, Lock
+  Bell, MessageSquare, Wind, Music, Square, Printer, Save, MonitorPlay, SkipForward, SkipBack, StopCircle, LayoutTemplate, Lock, VolumeX
 } from 'lucide-react';
 import { toHindiDigits, playSimpleSound, playCallSequence } from '../utils';
 import { supabase, subscribeToChanges } from '../supabase';
@@ -470,6 +470,35 @@ const AdminPanel: React.FC = () => {
                    <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 flex items-center justify-center text-center">
                       <p className="text-blue-800 font-bold text-sm">الحالة الحالية: <span className="font-black text-lg">{displayConfig.video_status === 'play' ? 'تشغيل' : displayConfig.video_status === 'pause' ? 'مؤقت' : 'متوقف'}</span></p>
                    </div>
+                </div>
+
+                {/* التحكم في الصوت الجديد */}
+                <div className="mt-8 pt-6 border-t border-slate-200">
+                    <h4 className="font-bold text-slate-700 mb-4 flex items-center gap-2"><Volume2 size={20}/> إعدادات الصوت</h4>
+                    <div className="flex items-center gap-6 bg-slate-50 p-6 rounded-2xl border">
+                        <button 
+                            onClick={() => updateDisplayConfig({ video_muted: !displayConfig.video_muted })}
+                            className={`p-4 rounded-2xl transition-all flex items-center gap-2 font-black ${displayConfig.video_muted ? 'bg-red-600 text-white' : 'bg-slate-200 text-slate-600 hover:bg-slate-300'}`}
+                        >
+                            {displayConfig.video_muted ? <><VolumeX size={24}/> مكتوم</> : <><Volume2 size={24}/> تشغيل الصوت</>}
+                        </button>
+                        
+                        <div className="flex-1">
+                            <label className="text-xs font-bold text-slate-500 mb-2 flex justify-between">
+                                <span>مستوى الصوت</span>
+                                <span className="bg-white px-2 rounded-md border">{displayConfig.video_volume}%</span>
+                            </label>
+                            <input 
+                                type="range" 
+                                min="0" 
+                                max="100" 
+                                className="w-full h-4 bg-slate-200 rounded-lg appearance-none cursor-pointer accent-blue-600"
+                                value={displayConfig.video_volume} 
+                                onChange={e => updateDisplayConfig({ video_volume: parseInt(e.target.value) })} 
+                                disabled={displayConfig.video_muted}
+                            />
+                        </div>
+                    </div>
                 </div>
              </div>
 

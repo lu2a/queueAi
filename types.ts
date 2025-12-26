@@ -64,4 +64,6 @@ export interface DisplayConfig {
   cards_percent: number;
   video_status: 'play' | 'pause' | 'stop';
   video_trigger?: string;
+  video_muted?: boolean;
+  video_volume?: number;
 }

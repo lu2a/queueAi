@@ -33,7 +33,9 @@ const DisplayScreen: React.FC = () => {
     themeColor: '#2563eb',
     cardBg: '#ffffff',
     cardTextColor: '#1e3a8a',
-    videoStatus: 'play' // play, pause, stop
+    videoStatus: 'play', // play, pause, stop
+    videoMuted: false,
+    videoVolume: 100
   });
 
   useEffect(() => {
@@ -69,7 +71,9 @@ const DisplayScreen: React.FC = () => {
             columns: newConfig.columns_count,
             layoutSplitPercent: newConfig.cards_percent,
             showVideo: newConfig.video_status !== 'stop',
-            videoStatus: newConfig.video_status
+            videoStatus: newConfig.video_status,
+            videoMuted: newConfig.video_muted ?? false,
+            videoVolume: newConfig.video_volume ?? 100
          }));
 
          // معالجة أوامر الفيديو
@@ -107,16 +111,21 @@ const DisplayScreen: React.FC = () => {
     };
   }, [audioReady, doctors.length]);
 
-  // التحكم الفعلي في الفيديو بناء على الحالة
+  // التحكم الفعلي في الفيديو بناء على الحالة (تشغيل، إيقاف، صوت)
   useEffect(() => {
     if (videoRef.current) {
+      // التحكم في الحالة
       if (config.videoStatus === 'play') {
         videoRef.current.play().catch(e => console.log('Autoplay blocked', e));
       } else if (config.videoStatus === 'pause') {
         videoRef.current.pause();
       }
+
+      // التحكم في الصوت
+      videoRef.current.muted = config.videoMuted;
+      videoRef.current.volume = config.videoVolume / 100;
     }
-  }, [config.videoStatus, currentVideoIndex]);
+  }, [config.videoStatus, currentVideoIndex, config.videoMuted, config.videoVolume]);
 
   const fetchInitialData = async () => {
     const { data: scr } = await supabase.from('screens').select('*').order('number');
@@ -139,7 +148,9 @@ const DisplayScreen: React.FC = () => {
           columns: dc.columns_count,
           layoutSplitPercent: dc.cards_percent,
           showVideo: dc.video_status !== 'stop',
-          videoStatus: dc.video_status
+          videoStatus: dc.video_status,
+          videoMuted: dc.video_muted ?? false,
+          videoVolume: dc.video_volume ?? 100
        }));
     }
   };
@@ -256,7 +267,7 @@ const DisplayScreen: React.FC = () => {
           <div className="flex-1 bg-black flex items-center justify-center relative transition-all duration-500">
             <video 
               ref={videoRef}
-              className="w-full h-full object-cover opacity-60" 
+              className="w-full h-full object-cover opacity-100" 
               autoPlay 
               muted 
               src={`/videos/${currentVideoIndex}.mp4`} 

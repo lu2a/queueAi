@@ -5,6 +5,39 @@ import { toHindiDigits, playCallSequence, playSimpleSound } from '../utils';
 import { Clinic, SystemSettings, Notification, Doctor, Screen, DisplayConfig } from '../types';
 import { supabase, subscribeToChanges } from '../supabase';
 
+// مكون فرعي لعرض صورة الطبيب والتعامل مع احتمال وجودها بصيغة jpg أو png
+const DoctorImage = ({ number }: { number: number }) => {
+  const [src, setSrc] = useState(`/doctors/${number}.jpg`);
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    // عند تغير رقم الطبيب، نعود لمحاولة تحميل الـ jpg أولاً
+    setSrc(`/doctors/${number}.jpg`);
+    setError(false);
+  }, [number]);
+
+  if (error) {
+    return <User size={40} className="text-slate-300" />;
+  }
+
+  return (
+    <img 
+      src={src} 
+      className="w-full h-full object-cover" 
+      onError={() => {
+        // إذا فشل تحميل الـ jpg، نحاول تحميل png
+        if (src.endsWith('.jpg')) {
+          setSrc(`/doctors/${number}.png`);
+        } else {
+          // إذا فشل كلاهما، نظهر أيقونة المستخدم
+          setError(true);
+        }
+      }}
+      alt={`Doctor ${number}`}
+    />
+  );
+};
+
 const DisplayScreen: React.FC = () => {
   const [isLoggedIn, setIsLoggedIn] = useState(false);
   const [screens, setScreens] = useState<Screen[]>([]);
@@ -238,7 +271,7 @@ const DisplayScreen: React.FC = () => {
             {currentDoctor ? (
               <div className="bg-white rounded-[2.5rem] border-r-[10px] border-blue-600 shadow-lg p-4 flex items-center gap-4 h-36">
                 <div className="w-20 h-20 bg-slate-50 rounded-2xl overflow-hidden flex items-center justify-center shrink-0 border">
-                   {currentDoctor.image_url ? <img src={currentDoctor.image_url} className="w-full h-full object-cover" /> : <User size={40} className="text-slate-300" />}
+                   <DoctorImage number={currentDoctor.number} />
                 </div>
                 <div className="overflow-hidden flex-1">
                   <h4 className="text-2xl font-black text-slate-800 truncate">{currentDoctor.name}</h4>
